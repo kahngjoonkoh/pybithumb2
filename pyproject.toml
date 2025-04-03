@@ -1,0 +1,67 @@
+[build-system]
+requires = [
+    "setuptools>=71.1",
+    "setuptools-scm>=8.1"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pybithumb2"
+description = "Bithumb API 2.0 wrapper for Python environments using Pydantic models"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+authors = [
+    { name = "kahngjoonkoh", email = "kahngjoonk@gmail.com" }
+]
+keywords = [
+    "python",
+    "client",
+    "library",
+    "trading",
+    "websocket",
+    "realtime",
+    "investing",
+    "crypto",
+    "bithumb",
+    "api"
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Typing :: Typed"
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic==2.11.1",
+    "PyJWT==2.10.1",
+    "pytest==8.3.2",
+    "python-dotenv==1.1.0",
+    "Requests==2.32.3"
+]
+dynamic = [
+    "version",
+]
+[project.urls]
+"Issues" = "https://github.com/kahngjoonkoh/pybithumb2/issues"
+"Documentation" = "https://github.com/kahngjoonkoh/pybithumb2/docs"
+"Source Code" = "https://github.com/kahngjoonkoh/pybithumb2"
+
+[tool.setuptools.dynamic]
+version = { attr = "pybithumb2.__env__.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pybithumb2"]
+exclude = ["tests"]

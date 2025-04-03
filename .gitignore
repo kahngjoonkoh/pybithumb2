@@ -1,1 +1,13 @@
 .env
+
+# Ignore all compiled Python files
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore __pycache__ directories
+__pycache__/
+
+# Ignore Build directories
+dist/
+*.egg-info

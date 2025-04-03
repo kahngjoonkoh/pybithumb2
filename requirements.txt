@@ -1,0 +1,5 @@
+pydantic==2.11.1
+PyJWT==2.10.1
+pytest==8.3.2
+python-dotenv==1.1.0
+Requests==2.32.3
