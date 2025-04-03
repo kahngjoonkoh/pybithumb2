@@ -9,11 +9,17 @@ from requests import Session, HTTPError
 from urllib.parse import urlencode
 
 from pybithumb2.types import HTTPResult
-from pybithumb2.exceptions import RetryException, APIError
+from pybithumb2.exceptions import APIError
 
 
 class RESTClient(ABC):
-    def __init__(self, base_url: str, api_key: Optional[str] = None, secret_key: Optional[str] = None, use_raw_data: bool = False):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: Optional[str] = None,
+        secret_key: Optional[str] = None,
+        use_raw_data: bool = False,
+    ):
         self._base_url = base_url
         self._api_key = api_key
         self._secret_key = secret_key
@@ -69,12 +75,11 @@ class RESTClient(ABC):
         except HTTPError as http_error:
             error = response.text
             raise APIError(error, http_error)
-        
+
         if response.text != "":
             return response.json()
-        else: 
+        else:
             raise APIError("Response is empty")
-
 
     # Query is the str after ?
     def _generate_headers(self, is_private: bool, query: Optional[str]) -> dict:
@@ -82,21 +87,21 @@ class RESTClient(ABC):
             return {"accept": "application/json"}
         # Generate access token
         payload = {
-            'access_key': self._api_key,
-            'nonce': str(uuid.uuid4()),
-            'timestamp': round(time.time() * 1000)
+            "access_key": self._api_key,
+            "nonce": str(uuid.uuid4()),
+            "timestamp": round(time.time() * 1000),
         }
         if query:
             hash = hashlib.sha512()
             hash.update(query.encode())
             query_hash = hash.hexdigest()
-            payload['query_hash'] = query_hash
-            payload['query_hash_alg'] = 'SHA512'
+            payload["query_hash"] = query_hash
+            payload["query_hash_alg"] = "SHA512"
 
         jwt_token = jwt.encode(payload, self._secret_key)
         authorization_token = f"Bearer {jwt_token}"
 
-        return {'Authorization': authorization_token}
+        return {"Authorization": authorization_token}
 
     def get(
         self, path: str, is_private: bool, data: Optional[Union[dict, str]] = None
@@ -114,7 +119,10 @@ class RESTClient(ABC):
         return self._request("GET", path, is_private, data)
 
     def post(
-        self, path: str, is_private: bool, data: Optional[Union[dict, List[dict]]] = None
+        self,
+        path: str,
+        is_private: bool,
+        data: Optional[Union[dict, List[dict]]] = None,
     ) -> HTTPResult:
         """Performs a single POST request
 
@@ -154,7 +162,9 @@ class RESTClient(ABC):
         """
         return self._request("PATCH", path, is_private, data)
 
-    def delete(self, path, is_private: bool, data: Optional[Union[dict, str]] = None) -> dict:
+    def delete(
+        self, path, is_private: bool, data: Optional[Union[dict, str]] = None
+    ) -> dict:
         """Performs a single DELETE request
 
         Args:
@@ -165,4 +175,3 @@ class RESTClient(ABC):
             dict: The response
         """
         return self._request("DELETE", path, is_private, data)
-

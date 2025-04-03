@@ -9,10 +9,8 @@ HTTPResult = Union[dict, List[dict], Any]
 #     KRW = "KRW"
 #     BTC = "BTC"
 
-class MarketWarning(Enum):
-    NONE = "NONE"
-    CAUTION = "CAUTION"
 
+class FormattableEnum(Enum):
     def __repr__(self):
         return f"{self.__class__.__name__}.{self.name}"
 
@@ -20,7 +18,12 @@ class MarketWarning(Enum):
         return self.value
 
 
-class WarningType(Enum):
+class MarketWarning(FormattableEnum):
+    NONE = "NONE"
+    CAUTION = "CAUTION"
+
+
+class WarningType(FormattableEnum):
     """
     경보 유형:
         PRICE_SUDDEN_FLUCTUATION: 가격 급등락
@@ -30,8 +33,10 @@ class WarningType(Enum):
         SPECIFIC_ACCOUNT_HIGH_TRANSACTION: 소수계좌 거래 집중
         EXCHANGE_TRADING_CONCENTRATION: 거래소 거래 집중
     """
+
     PRICE_SUDDEN_FLUCTUATION = "PRICE_SUDDEN_FLUCTUATION"
     TRADING_VOLUME_SUDDEN_FLUCTUATION = "TRADING_VOLUME_SUDDEN_FLUCTUATION"
+    DEPOSIT_AMOUNT_SUDDEN_FLUCTUATION = "DEPOSIT_AMOUNT_SUDDEN_FLUCTUATION"
     PRICE_DIFFERENCE_HIGH = "PRICE_DIFFERENCE_HIGH"
     SPECIFIC_ACCOUNT_HIGH_TRANSACTION = "SPECIFIC_ACCOUNT_HIGH_TRANSACTION"
     EXCHANGE_TRADING_CONCENTRATION = "EXCHANGE_TRADING_CONCENTRATION"

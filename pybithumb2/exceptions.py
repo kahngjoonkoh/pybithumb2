@@ -37,11 +37,3 @@ class APIError(Exception):
     def response(self):
         if self._http_error is not None:
             return self._http_error.response
-
-
-class RetryException(Exception):
-    """
-    Thrown by RESTClient's internally to represent a request that should be retried.
-    """
-
-    pass

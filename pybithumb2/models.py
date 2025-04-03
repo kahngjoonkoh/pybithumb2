@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from dataclasses import dataclass
 from pydantic import BaseModel, field_validator
 
-from pybithumb2.types import MarketWarning
+from pybithumb2.types import MarketWarning, WarningType
+from pybithumb2.constants import DATETIME_FORMAT, KST
 
 class FormattableBaseModel(BaseModel):
     def __init__(self, **data):
@@ -11,17 +13,31 @@ class FormattableBaseModel(BaseModel):
         for key in list(self.__dict__.keys()):
             if self.__dict__[key] is None:
                 del self.__dict__[key]
+                
+    @field_validator("*", mode="before")
+    @classmethod
+    def validate_field(cls, value, info):
+        """Dynamically converts fields to their expected type."""
+        expected_type = cls.model_fields[info.field_name].annotation  # Get expected type
 
+        if isinstance(value, str) and isinstance(expected_type, type):
+            try:
+                return expected_type(value)  # Convert to expected type
+            except ValueError:
+                pass  # If conversion fails, return original value
+
+        return value
+    
     def __repr__(self) -> str:
         field_strings = ", ".join(
-            f"{name}={getattr(self, name)!r}"
-            for name in self.__dict__
+            f"{name}={getattr(self, name)!r}" for name in self.__dict__
         )
         return f"{self.__class__.__name__}({field_strings})"
 
     def __str__(self) -> str:
         return self.__repr__()
-    
+
+
 @dataclass(frozen=True)
 class Currency:
     code: str
@@ -41,10 +57,13 @@ class Market(FormattableBaseModel):
     def from_string(cls, market_str: str) -> "Market":
         try:
             currency_from, currency_to = market_str.split("-")
-            return cls(currency_from=Currency(code=currency_from), currency_to=Currency(code=currency_to))
+            return cls(
+                currency_from=Currency(code=currency_from),
+                currency_to=Currency(code=currency_to),
+            )
         except ValueError:
             raise ValueError(f"Invalid market format: {market_str}")
-      
+
     def __str__(self) -> str:
         return f"{self.currency_from}-{self.currency_to}"
 
@@ -55,10 +74,30 @@ class MarketInfo(FormattableBaseModel):
     english_name: str
     market_warning: Optional[MarketWarning] = None
 
-    @field_validator("market", mode="before")
+    @field_validator("market", mode="before", check_fields=False)
     def validate_market(cls, value):
         if isinstance(value, str):
-            return Market.from_string(value)  # Convert "KRW-BTC" → Market(Currency("KRW"), Currency("BTC"))
+            return Market.from_string(
+                value
+            )  # Convert "KRW-BTC" → Market(Currency("KRW"), Currency("BTC"))
+        return value
+
+
+class WarningMarketInfo(FormattableBaseModel):
+    market: Market
+    warning_type: WarningType
+    end_date: datetime  # KST
+
+    @field_validator("market", mode="before", check_fields=False)
+    def validate_market(cls, value):
+        if isinstance(value, str):
+            return Market.from_string(value)
+        return value
+    
+    @field_validator("end_date", mode="before", check_fields=False)
+    def validate_datetime(cls, value):
+        if isinstance(value, str):
+            return datetime.strptime(value, DATETIME_FORMAT)
         return value
 
 
@@ -70,37 +109,37 @@ class Account(FormattableBaseModel):
     avg_buy_price_modified: bool
     unit_currency: Currency
 
-    @field_validator("currency", "unit_currency", mode="before")
-    def validate_market(cls, value):
-        if isinstance(value, str):
-            return Currency(value)
-        return value
-
 
 def clean_and_format_data(data: dict) -> dict:
     """removes empty values and converts non json serializable types"""
 
     def map_values(val: Any) -> Any:
         if isinstance(val, dict):
-           return {
+            return {
                 k: map_values(v)
                 for k, v in val.items()
                 if v is not None and v != {} and len(str(v)) > 0
             }
-        
+
         elif isinstance(val, list):
             return [map_values(v) for v in val if v is not None and v != {}]
-        
+
         # elif isinstance(val, bool):
         #     return str(val).lower()
-        
+
+        elif isinstance(val, datetime):
+            # if the datetime is naive, assume it's KST
+            # https://docs.python.org/3/library/datetime.html#determining-if-an-object-is-aware-or-naive
+            if val.tzinfo is None or val.tzinfo.utcoffset(val) is None:
+                val = val.replace(tzinfo=KST)
+            return val.strftime(DATETIME_FORMAT)
+
         return val
 
     return map_values(data)
-    
 
 
-#TOODOOOD!!!!!!!!!!!!!1
+# TOODOOOD!!!!!!!!!!!!!1
 def serialize(self) -> dict:
     """
     the equivalent of self::dict but removes empty values and handles converting non json serializable types.

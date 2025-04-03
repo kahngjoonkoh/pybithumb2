@@ -7,7 +7,7 @@ def test_get_accounts(api_client: BithumbClient, raw_api_client: BithumbClient):
 
     assert len(response) == len(raw_response)
     assert len(response) > 0
-    
+
     test_item = response[0]
     raw_test_item = raw_response[0]
 
