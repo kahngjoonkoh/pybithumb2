@@ -22,7 +22,7 @@ def clean_and_format_data(data: dict) -> dict:
             }
 
         elif isinstance(val, list):
-            return [map_values(v) for v in val if v is not None and v != {}]
+            return [map_values(v) for v in val if v is not None and v != {}].join(',')
 
         # elif isinstance(val, bool):
         #     return str(val).lower()

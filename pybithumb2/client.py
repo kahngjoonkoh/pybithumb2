@@ -15,6 +15,7 @@ from pybithumb2.models import (
     MonthCandle,
     TimeUnit,
     TradeInfo,
+    Snapshot,
     WarningMarketInfo,
 )
 from pybithumb2.rest import RESTClient
@@ -152,6 +153,18 @@ class BithumbClient(RESTClient):
             return response
 
         return DFList[TradeInfo]([TradeInfo.model_validate(item) for item in response])
+
+    def get_snapshot(self, markets: List[Market]) -> Union[DFList[Snapshot], RawData]:
+        data = locals().copy()
+        data.pop("self")
+        data = clean_and_format_data(data)
+
+        response = self.get("/v1/ticker", is_private=False, data=data)
+
+        if self._use_raw_data:
+            return response
+
+        return DFList[Snapshot]([Snapshot.model_validate(item) for item in response])
 
     def get_warning_markets(self) -> Union[List[WarningMarketInfo], RawData]:
         response = self.get("/v1/market/virtual_asset_warning", is_private=False)

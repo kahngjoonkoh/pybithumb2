@@ -19,6 +19,12 @@ class TradeSide(FormattableEnum):
     BID = "BID"
 
 
+class ChangeType(FormattableEnum):
+    EVEN = "EVEN"
+    RISE = "RISE"
+    FALL = "FALL"
+
+
 class MarketWarning(FormattableEnum):
     NONE = "NONE"
     CAUTION = "CAUTION"

@@ -1,14 +1,17 @@
-from datetime import datetime, date, time, timezone
-from abc import ABC
-import types
-from typing import Any, List, cast, Type, TypeVar, Iterable, Generic, Dict, Optional, TYPE_CHECKING
+from datetime import datetime, date, time
+from typing import (
+    TypeVar,
+    Generic,
+    Optional,
+    TYPE_CHECKING,
+)
 from dataclasses import dataclass
 from decimal import Decimal
 from pydantic import BaseModel, field_validator
 
-from pybithumb2.types import TradeSide, MarketWarning, WarningType
+from pybithumb2.types import ChangeType, TradeSide, MarketWarning, WarningType
 from pybithumb2.utils import parse_datetime, clean_and_format_data
-from pybithumb2.constants import DATE_FORMAT, TIME_FORMAT
+from pybithumb2.constants import DATE_FORMAT, TIME_FORMAT, CONNECTED_DATE_FORMAT, CONNECTED_TIME_FORMAT
 
 
 if TYPE_CHECKING:
@@ -20,7 +23,7 @@ class DataFramable:
         import pandas as pd
 
         return pd.DataFrame([clean_and_format_data(self.__dict__)])
-    
+
 
 T = TypeVar("T", bound="DataFramable")
 
@@ -209,17 +212,70 @@ class TradeInfo(FormattableBaseModel):
         if isinstance(value, str):
             return Market.from_string(value)
         return value
-    
+
     @field_validator("trade_date_utc", mode="before", check_fields=False)
     def validate_date(cls, value):
         if isinstance(value, str):
             return datetime.strptime(value, DATE_FORMAT).date()
         return value
-    
+
     @field_validator("trade_time_utc", mode="before", check_fields=False)
     def validate_time(cls, value):
         if isinstance(value, str):
             return datetime.strptime(value, TIME_FORMAT).time()
+        return value
+
+
+"""*위 응답의 change, change_price, change_rate, signed_change_price, signed_change_rate 필드는 전일종가의 대비 값입니다."""
+class Snapshot(FormattableBaseModel):
+    market: Market
+    trade_date: date
+    trade_time: time
+    trade_date_kst: date
+    trade_time_kst: time
+    trade_timestamp: int # Unix timestamp
+    opening_price: Decimal
+    high_price: Decimal
+    low_price: Decimal
+    trade_price: Decimal
+    prev_closing_price: Decimal
+    change: ChangeType
+    change_rate: Decimal
+    signed_change_price: Decimal
+    signed_change_rate: Decimal
+    trade_volume: Decimal
+    acc_trade_price: Decimal
+    acc_trade_price_24h: Decimal
+    acc_trade_volume: Decimal
+    acc_trade_volume_24h: Decimal
+    highest_52_week_price: Decimal
+    highest_52_week_date: date
+    lowest_52_week_price: Decimal
+    lowest_52_week_date: date
+    timestamp: int
+
+    @field_validator("market", mode="before", check_fields=False)
+    def validate_market(cls, value):
+        if isinstance(value, str):
+            return Market.from_string(value)
+        return value
+    
+    @field_validator("trade_date", "trade_date_kst", mode="before", check_fields=False)
+    def validate_connected_date(cls, value):
+        if isinstance(value, str):
+            return datetime.strptime(value, CONNECTED_DATE_FORMAT).date()
+        return value
+
+    @field_validator("trade_time", "trade_time_kst", mode="before", check_fields=False)
+    def validate_connected_time(cls, value):
+        if isinstance(value, str):
+            return datetime.strptime(value, CONNECTED_TIME_FORMAT).time()
+        return value
+    
+    @field_validator("highest_52_week_date", "lowest_52_week_date", mode="before", check_fields=False)
+    def validate_date(cls, value):
+        if isinstance(value, str):
+            return datetime.strptime(value, DATE_FORMAT).date()
         return value
 
 
