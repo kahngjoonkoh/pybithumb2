@@ -3,15 +3,22 @@ from typing import (
     TypeVar,
     Generic,
     Optional,
+    List,
     TYPE_CHECKING,
 )
 from dataclasses import dataclass
 from decimal import Decimal
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, GetCoreSchemaHandler, ConfigDict, Field, field_validator
+from pydantic_core import core_schema
 
 from pybithumb2.types import ChangeType, TradeSide, MarketWarning, WarningType
 from pybithumb2.utils import parse_datetime, clean_and_format_data
-from pybithumb2.constants import DATE_FORMAT, TIME_FORMAT, CONNECTED_DATE_FORMAT, CONNECTED_TIME_FORMAT
+from pybithumb2.constants import (
+    DATE_FORMAT,
+    TIME_FORMAT,
+    CONNECTED_DATE_FORMAT,
+    CONNECTED_TIME_FORMAT,
+)
 
 
 if TYPE_CHECKING:
@@ -28,7 +35,7 @@ class DataFramable:
 T = TypeVar("T", bound="DataFramable")
 
 
-class DFList(Generic[T], list[T]):
+class DFList(Generic[T], List[T]):
     def df(self) -> "pd.DataFrame":
         import pandas as pd
 
@@ -132,13 +139,13 @@ class Candle(FormattableBaseModel):
     market: Market
     candle_date_time_utc: datetime
     candle_date_time_kst: datetime
-    opening_price: Decimal
-    high_price: Decimal
-    low_price: Decimal
-    trade_price: Decimal
-    timestamp: int
-    candle_acc_trade_price: Decimal
-    candle_acc_trade_volume: Decimal
+    opening_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    high_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    low_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    trade_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    timestamp: int = 0
+    candle_acc_trade_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    candle_acc_trade_volume: Decimal = Field(default_factory=lambda: Decimal(0))
 
     @field_validator("market", mode="before", check_fields=False)
     def validate_market(cls, value):
@@ -169,9 +176,9 @@ class MinuteCandle(Candle):
 
 
 class DayCandle(Candle):
-    prev_closing_price: Decimal
-    change_price: Decimal
-    change_rate: Decimal
+    prev_closing_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    change_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    change_rate: Decimal = Field(default_factory=lambda: Decimal(0))
     converted_trade_price: Optional[Decimal] = None
 
 
@@ -199,11 +206,11 @@ class TradeInfo(FormattableBaseModel):
     market: Market
     trade_date_utc: date
     trade_time_utc: time
-    timestamp: int
-    trade_price: Decimal
-    trade_volume: Decimal
-    prev_closing_price: Decimal
-    change_price: Decimal
+    timestamp: int = 0
+    trade_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    trade_volume: Decimal = Field(default_factory=lambda: Decimal(0))
+    prev_closing_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    change_price: Decimal = Field(default_factory=lambda: Decimal(0))
     ask_bid: TradeSide
     sequential_id: Optional[int] = None
 
@@ -227,39 +234,41 @@ class TradeInfo(FormattableBaseModel):
 
 
 """*위 응답의 change, change_price, change_rate, signed_change_price, signed_change_rate 필드는 전일종가의 대비 값입니다."""
+
+
 class Snapshot(FormattableBaseModel):
     market: Market
     trade_date: date
     trade_time: time
     trade_date_kst: date
     trade_time_kst: time
-    trade_timestamp: int # Unix timestamp
-    opening_price: Decimal
-    high_price: Decimal
-    low_price: Decimal
-    trade_price: Decimal
-    prev_closing_price: Decimal
+    trade_timestamp: int = 0  # Unix timestamp
+    opening_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    high_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    low_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    trade_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    prev_closing_price: Decimal = Field(default_factory=lambda: Decimal(0))
     change: ChangeType
-    change_rate: Decimal
-    signed_change_price: Decimal
-    signed_change_rate: Decimal
-    trade_volume: Decimal
-    acc_trade_price: Decimal
-    acc_trade_price_24h: Decimal
-    acc_trade_volume: Decimal
-    acc_trade_volume_24h: Decimal
-    highest_52_week_price: Decimal
+    change_rate: Decimal = Field(default_factory=lambda: Decimal(0))
+    signed_change_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    signed_change_rate: Decimal = Field(default_factory=lambda: Decimal(0))
+    trade_volume: Decimal = Field(default_factory=lambda: Decimal(0))
+    acc_trade_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    acc_trade_price_24h: Decimal = Field(default_factory=lambda: Decimal(0))
+    acc_trade_volume: Decimal = Field(default_factory=lambda: Decimal(0))
+    acc_trade_volume_24h: Decimal = Field(default_factory=lambda: Decimal(0))
+    highest_52_week_price: Decimal = Field(default_factory=lambda: Decimal(0))
     highest_52_week_date: date
-    lowest_52_week_price: Decimal
+    lowest_52_week_price: Decimal = Field(default_factory=lambda: Decimal(0))
     lowest_52_week_date: date
-    timestamp: int
+    timestamp: int = 0
 
     @field_validator("market", mode="before", check_fields=False)
     def validate_market(cls, value):
         if isinstance(value, str):
             return Market.from_string(value)
         return value
-    
+
     @field_validator("trade_date", "trade_date_kst", mode="before", check_fields=False)
     def validate_connected_date(cls, value):
         if isinstance(value, str):
@@ -271,13 +280,60 @@ class Snapshot(FormattableBaseModel):
         if isinstance(value, str):
             return datetime.strptime(value, CONNECTED_TIME_FORMAT).time()
         return value
-    
-    @field_validator("highest_52_week_date", "lowest_52_week_date", mode="before", check_fields=False)
+
+    @field_validator(
+        "highest_52_week_date", "lowest_52_week_date", mode="before", check_fields=False
+    )
     def validate_date(cls, value):
         if isinstance(value, str):
             return datetime.strptime(value, DATE_FORMAT).date()
         return value
 
+
+class OrderBookUnit(FormattableBaseModel):
+    ask_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    bid_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    ask_size: Decimal = Field(default_factory=lambda: Decimal(0))
+    bid_size: Decimal = Field(default_factory=lambda: Decimal(0))
+
+
+"""orderbook_units 리스트에는 15호가 정보를 차례대로
+(1호가, 2호가 ... 15호가) 담고 있습니다. 단, market
+에 단일 마켓 코드만 입력 시 orderbook_units 리스트에 
+30호가까지의 정보를 제공합니다."""
+
+# class OrderBookUnits(DFList[OrderBookUnit]):
+#     def __get_pydantic_core_schema__(self, handler: GetCoreSchemaHandler):
+#         inner_schema = handler.generate_schema(OrderBookUnit)  # Only allow OrderBookUnit
+#         return core_schema.list_schema(inner_schema)
+
+class OrderBook(FormattableBaseModel):
+    market: Market
+    timestamp: int = 0
+    total_ask_size: Decimal = Field(default_factory=lambda: Decimal(0))
+    total_bid_size: Decimal = Field(default_factory=lambda: Decimal(0))
+    orderbook_units: List[OrderBookUnit]
+
+    def model_post_init(self, __context):
+        self.__dict__["orderbook_units"] = DFList(self.orderbook_units)
+
+    @property
+    def orderbook_units(self) -> DFList[OrderBookUnit]:
+        return self.__dict__["orderbook_units"]
+    
+    @field_validator("market", mode="before", check_fields=False)
+    def validate_market(cls, value):
+        if isinstance(value, str):
+            return Market.from_string(value)
+        return value
+    
+    @field_validator("orderbook_units", mode="before", check_fields=False)
+    def validate_orderbook_units(cls, value):
+        if isinstance(value, list):
+            return [OrderBookUnit.model_validate(v) if isinstance(v, dict) else v for v in value]
+        raise ValueError("orderbook_units must be a list of OrderBookUnit or dict representations.")
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 class WarningMarketInfo(FormattableBaseModel):
     market: Market
@@ -302,5 +358,5 @@ class Account(FormattableBaseModel):
     balance: Decimal
     locked: Decimal
     avg_buy_price: Decimal
-    avg_buy_price_modified: bool
+    avg_buy_price_modified: bool = True
     unit_currency: Currency

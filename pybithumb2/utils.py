@@ -22,10 +22,7 @@ def clean_and_format_data(data: dict) -> dict:
             }
 
         elif isinstance(val, list):
-            return [map_values(v) for v in val if v is not None and v != {}].join(',')
-
-        # elif isinstance(val, bool):
-        #     return str(val).lower()
+            return ",".join(map_values(v) for v in val if v is not None and v != {})
 
         elif isinstance(val, time):
             return val.strftime(TIME_FORMAT)
