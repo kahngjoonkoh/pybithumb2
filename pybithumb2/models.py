@@ -1,19 +1,38 @@
-from datetime import datetime, date, timezone
+from datetime import datetime, date, time, timezone
 from abc import ABC
-from typing import Any, List, TypeVar, Iterable, Generic, Dict, Optional, TYPE_CHECKING
+import types
+from typing import Any, List, cast, Type, TypeVar, Iterable, Generic, Dict, Optional, TYPE_CHECKING
 from dataclasses import dataclass
 from decimal import Decimal
 from pydantic import BaseModel, field_validator
 
-from pybithumb2.types import MarketWarning, WarningType
+from pybithumb2.types import TradeSide, MarketWarning, WarningType
 from pybithumb2.utils import parse_datetime, clean_and_format_data
+from pybithumb2.constants import DATE_FORMAT, TIME_FORMAT
 
 
 if TYPE_CHECKING:
     import pandas as pd
 
 
-class FormattableBaseModel(BaseModel):
+class DataFramable:
+    def df(self) -> "pd.DataFrame":
+        import pandas as pd
+
+        return pd.DataFrame([clean_and_format_data(self.__dict__)])
+    
+
+T = TypeVar("T", bound="DataFramable")
+
+
+class DFList(Generic[T], list[T]):
+    def df(self) -> "pd.DataFrame":
+        import pandas as pd
+
+        return pd.concat([c.df() for c in self], ignore_index=True)
+
+
+class FormattableBaseModel(BaseModel, DataFramable):
     def __init__(self, **data):
         super().__init__(**data)
         # Remove keys with None values from __dict__
@@ -92,33 +111,6 @@ class MarketInfo(FormattableBaseModel):
         return value
 
 
-class WarningMarketInfo(FormattableBaseModel):
-    market: Market
-    warning_type: WarningType
-    end_date: datetime  # KST
-
-    @field_validator("market", mode="before", check_fields=False)
-    def validate_market(cls, value):
-        if isinstance(value, str):
-            return Market.from_string(value)
-        return value
-
-    @field_validator("end_date", mode="before", check_fields=False)
-    def validate_datetime(cls, value):
-        if isinstance(value, str):
-            return parse_datetime(value)
-        return value
-
-
-class Account(FormattableBaseModel):
-    currency: Currency
-    balance: Decimal
-    locked: Decimal
-    avg_buy_price: Decimal
-    avg_buy_price_modified: bool
-    unit_currency: Currency
-
-
 class TimeUnit(FormattableBaseModel):
     minutes: int
 
@@ -162,17 +154,6 @@ class Candle(FormattableBaseModel):
             return parse_datetime(value)
         return value
 
-    def __iter__(self):
-        """Convert attributes to dict, ensuring custom classes are serialized."""
-        d = self.__dict__.copy()
-        d["market"] = self.market.to_dict()  # Convert custom class to dict
-        return iter(d.items())
-
-    def df(self) -> "pd.DataFrame":
-        import pandas as pd
-
-        return pd.DataFrame([clean_and_format_data(self.__dict__)])
-
 
 class MinuteCandle(Candle):
     unit: TimeUnit
@@ -197,7 +178,7 @@ class WeekCandle(Candle):
     @field_validator("first_day_of_period", mode="before", check_fields=False)
     def validate_date(cls, value):
         if isinstance(value, str):
-            return datetime.strptime(value, "%Y-%m-%d").date()
+            return datetime.strptime(value, DATE_FORMAT).date()
         return value
 
 
@@ -207,39 +188,63 @@ class MonthCandle(Candle):
     @field_validator("first_day_of_period", mode="before", check_fields=False)
     def validate_date(cls, value):
         if isinstance(value, str):
-            return datetime.strptime(value, "%Y-%m-%d").date()
+            return datetime.strptime(value, DATE_FORMAT).date()
         return value
 
 
-T = TypeVar("T", bound="Candle")
+class TradeInfo(FormattableBaseModel):
+    market: Market
+    trade_date_utc: date
+    trade_time_utc: time
+    timestamp: int
+    trade_price: Decimal
+    trade_volume: Decimal
+    prev_closing_price: Decimal
+    change_price: Decimal
+    ask_bid: TradeSide
+    sequential_id: Optional[int] = None
+
+    @field_validator("market", mode="before", check_fields=False)
+    def validate_market(cls, value):
+        if isinstance(value, str):
+            return Market.from_string(value)
+        return value
+    
+    @field_validator("trade_date_utc", mode="before", check_fields=False)
+    def validate_date(cls, value):
+        if isinstance(value, str):
+            return datetime.strptime(value, DATE_FORMAT).date()
+        return value
+    
+    @field_validator("trade_time_utc", mode="before", check_fields=False)
+    def validate_time(cls, value):
+        if isinstance(value, str):
+            return datetime.strptime(value, TIME_FORMAT).time()
+        return value
 
 
-class Candles(Generic[T], list[T]):
-    def df(self) -> "pd.DataFrame":
-        import pandas as pd
+class WarningMarketInfo(FormattableBaseModel):
+    market: Market
+    warning_type: WarningType
+    end_date: datetime  # KST
 
-        return pd.concat([c.df() for c in self], ignore_index=True)
+    @field_validator("market", mode="before", check_fields=False)
+    def validate_market(cls, value):
+        if isinstance(value, str):
+            return Market.from_string(value)
+        return value
 
-
-class MinuteCandles(Candles[MinuteCandle]):
-    """A strongly-typed collection of only MinuteCandle objects."""
-
-    pass  # Inherits df() method from Candles, but now restricted to MinuteCandle
-
-
-class DayCandles(Candles[DayCandle]):
-    """A strongly-typed collection of only DayCandle objects."""
-
-    pass
-
-
-class WeekCandles(Candles[WeekCandle]):
-    """A strongly-typed collection of only WeekCandle objects."""
-
-    pass
+    @field_validator("end_date", mode="before", check_fields=False)
+    def validate_datetime(cls, value):
+        if isinstance(value, str):
+            return parse_datetime(value)
+        return value
 
 
-class MonthCandles(Candles[MonthCandle]):
-    """A strongly-typed collection of only MonthCandle objects."""
-
-    pass
+class Account(FormattableBaseModel):
+    currency: Currency
+    balance: Decimal
+    locked: Decimal
+    avg_buy_price: Decimal
+    avg_buy_price_modified: bool
+    unit_currency: Currency

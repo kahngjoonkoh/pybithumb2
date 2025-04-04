@@ -1,22 +1,20 @@
 from typing import List, Optional, Union
-from datetime import datetime
+from datetime import datetime, time
 
 from pybithumb2.__env__ import API_BASE_URL
 from pybithumb2.types import RawData
 from pybithumb2.models import (
     Account,
     Currency,
+    DFList,
     Market,
     MarketInfo,
     MinuteCandle,
     DayCandle,
     WeekCandle,
     MonthCandle,
-    MinuteCandles,
-    DayCandles,
-    WeekCandles,
-    MonthCandles,
     TimeUnit,
+    TradeInfo,
     WarningMarketInfo,
 )
 from pybithumb2.rest import RESTClient
@@ -60,7 +58,7 @@ class BithumbClient(RESTClient):
         to: Optional[datetime] = None,
         count: int = 1,
         unit: TimeUnit = TimeUnit(1),
-    ) -> Union[MinuteCandles, RawData]:
+    ) -> Union[DFList[MinuteCandle], RawData]:
         if count <= 0 or count > 200:
             raise APIError("You can only request betwewen 1 and 200 candles")
 
@@ -74,7 +72,9 @@ class BithumbClient(RESTClient):
         if self._use_raw_data:
             return response
 
-        return MinuteCandles([MinuteCandle.model_validate(item) for item in response])
+        return DFList[MinuteCandle](
+            [MinuteCandle.model_validate(item) for item in response]
+        )
 
     def get_day_candles(
         self,
@@ -82,7 +82,7 @@ class BithumbClient(RESTClient):
         to: Optional[datetime] = None,
         count: int = 1,
         convertingPriceUnit: Optional[Currency] = None,
-    ) -> Union[DayCandles, RawData]:
+    ) -> Union[DFList[DayCandle], RawData]:
         if count <= 0 or count > 200:
             raise APIError("You can only request betwewen 1 and 200 candles")
         data = locals().copy()
@@ -94,11 +94,11 @@ class BithumbClient(RESTClient):
         if self._use_raw_data:
             return response
 
-        return DayCandles([DayCandle.model_validate(item) for item in response])
+        return DFList[DayCandle]([DayCandle.model_validate(item) for item in response])
 
     def get_week_candles(
         self, market: Market, to: Optional[datetime] = None, count: int = 1
-    ) -> Union[WeekCandles, RawData]:
+    ) -> Union[DFList[WeekCandle], RawData]:
         if count <= 0 or count > 200:
             raise APIError("You can only request betwewen 1 and 200 candles")
         data = locals().copy()
@@ -110,11 +110,13 @@ class BithumbClient(RESTClient):
         if self._use_raw_data:
             return response
 
-        return WeekCandles([WeekCandle.model_validate(item) for item in response])
+        return DFList[WeekCandle](
+            [WeekCandle.model_validate(item) for item in response]
+        )
 
     def get_month_candles(
         self, market: Market, to: Optional[datetime] = None, count: int = 1
-    ) -> Union[MonthCandles, RawData]:
+    ) -> Union[DFList[MonthCandle], RawData]:
         if count <= 0 or count > 200:
             raise APIError("You can only request betwewen 1 and 200 candles")
         data = locals().copy()
@@ -126,7 +128,30 @@ class BithumbClient(RESTClient):
         if self._use_raw_data:
             return response
 
-        return MonthCandles([MonthCandle.model_validate(item) for item in response])
+        return DFList[MonthCandle](
+            [MonthCandle.model_validate(item) for item in response]
+        )
+
+    def get_trades(
+        self,
+        market: Market,
+        to: Optional[time] = None,
+        count: int = 1,
+        # cursor: str, # No support for this yet. (I don't know what its supposed to do)
+        daysAgo: Optional[int] = None,
+    ) -> Union[TradeInfo, RawData]:
+        if daysAgo is not None and (daysAgo <= 0 or daysAgo > 7):
+            raise APIError("You can only request data from 1 to 7 days ago")
+        data = locals().copy()
+        data.pop("self")
+        data = clean_and_format_data(data)
+
+        response = self.get("/v1/trades/ticks", is_private=False, data=data)
+
+        if self._use_raw_data:
+            return response
+
+        return DFList[TradeInfo]([TradeInfo.model_validate(item) for item in response])
 
     def get_warning_markets(self) -> Union[List[WarningMarketInfo], RawData]:
         response = self.get("/v1/market/virtual_asset_warning", is_private=False)

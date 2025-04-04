@@ -5,10 +5,6 @@ RawData = Dict[str, Any]
 
 HTTPResult = Union[dict, List[dict], Any]
 
-# class Currency(Enum):
-#     KRW = "KRW"
-#     BTC = "BTC"
-
 
 class FormattableEnum(Enum):
     def __repr__(self):
@@ -16,6 +12,11 @@ class FormattableEnum(Enum):
 
     def __str__(self):
         return self.value
+
+
+class TradeSide(FormattableEnum):
+    ASK = "ASK"
+    BID = "BID"
 
 
 class MarketWarning(FormattableEnum):

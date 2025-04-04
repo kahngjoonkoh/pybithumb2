@@ -1,7 +1,8 @@
 from typing import Any
-from datetime import datetime
+from datetime import datetime, time
 
 from pybithumb2.constants import (
+    TIME_FORMAT,
     DATETIME_FORMAT,
     DATETIME_FORMAT_T,
     DATETIME_FORMAT_TZ,
@@ -25,6 +26,9 @@ def clean_and_format_data(data: dict) -> dict:
 
         # elif isinstance(val, bool):
         #     return str(val).lower()
+
+        elif isinstance(val, time):
+            return val.strftime(TIME_FORMAT)
 
         elif isinstance(val, datetime):
             # if the datetime is naive, assume it's KST
