@@ -1,10 +1,17 @@
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import datetime, date, timezone
+from abc import ABC
+from typing import Any, List, TypeVar, Iterable, Generic, Dict, Optional, TYPE_CHECKING
 from dataclasses import dataclass
+from decimal import Decimal
 from pydantic import BaseModel, field_validator
 
 from pybithumb2.types import MarketWarning, WarningType
-from pybithumb2.constants import DATETIME_FORMAT, KST
+from pybithumb2.utils import parse_datetime, clean_and_format_data
+
+
+if TYPE_CHECKING:
+    import pandas as pd
+
 
 class FormattableBaseModel(BaseModel):
     def __init__(self, **data):
@@ -13,12 +20,14 @@ class FormattableBaseModel(BaseModel):
         for key in list(self.__dict__.keys()):
             if self.__dict__[key] is None:
                 del self.__dict__[key]
-                
+
     @field_validator("*", mode="before")
     @classmethod
     def validate_field(cls, value, info):
         """Dynamically converts fields to their expected type."""
-        expected_type = cls.model_fields[info.field_name].annotation  # Get expected type
+        expected_type = cls.model_fields[
+            info.field_name
+        ].annotation  # Get expected type
 
         if isinstance(value, str) and isinstance(expected_type, type):
             try:
@@ -27,7 +36,7 @@ class FormattableBaseModel(BaseModel):
                 pass  # If conversion fails, return original value
 
         return value
-    
+
     def __repr__(self) -> str:
         field_strings = ", ".join(
             f"{name}={getattr(self, name)!r}" for name in self.__dict__
@@ -93,119 +102,144 @@ class WarningMarketInfo(FormattableBaseModel):
         if isinstance(value, str):
             return Market.from_string(value)
         return value
-    
+
     @field_validator("end_date", mode="before", check_fields=False)
     def validate_datetime(cls, value):
         if isinstance(value, str):
-            return datetime.strptime(value, DATETIME_FORMAT)
+            return parse_datetime(value)
         return value
 
 
 class Account(FormattableBaseModel):
     currency: Currency
-    balance: float
-    locked: float
-    avg_buy_price: float
+    balance: Decimal
+    locked: Decimal
+    avg_buy_price: Decimal
     avg_buy_price_modified: bool
     unit_currency: Currency
 
 
-def clean_and_format_data(data: dict) -> dict:
-    """removes empty values and converts non json serializable types"""
+class TimeUnit(FormattableBaseModel):
+    minutes: int
 
-    def map_values(val: Any) -> Any:
-        if isinstance(val, dict):
-            return {
-                k: map_values(v)
-                for k, v in val.items()
-                if v is not None and v != {} and len(str(v)) > 0
-            }
+    def __init__(self, minutes: int):
+        if minutes not in [1, 3, 5, 10, 15, 30, 60, 240]:
+            raise ValueError(
+                f"Time Unit can only be one of 1, 3, 5, 10, 15, 30, 60, 240 minutes, not {minutes}"
+            )
+        super().__init__(minutes=minutes)
 
-        elif isinstance(val, list):
-            return [map_values(v) for v in val if v is not None and v != {}]
-
-        # elif isinstance(val, bool):
-        #     return str(val).lower()
-
-        elif isinstance(val, datetime):
-            # if the datetime is naive, assume it's KST
-            # https://docs.python.org/3/library/datetime.html#determining-if-an-object-is-aware-or-naive
-            if val.tzinfo is None or val.tzinfo.utcoffset(val) is None:
-                val = val.replace(tzinfo=KST)
-            return val.strftime(DATETIME_FORMAT)
-
-        return val
-
-    return map_values(data)
+    def __str__(self) -> str:
+        return str(self.minutes)
 
 
-# TOODOOOD!!!!!!!!!!!!!1
-def serialize(self) -> dict:
-    """
-    the equivalent of self::dict but removes empty values and handles converting non json serializable types.
+class Candle(FormattableBaseModel):
+    market: Market
+    candle_date_time_utc: datetime
+    candle_date_time_kst: datetime
+    opening_price: Decimal
+    high_price: Decimal
+    low_price: Decimal
+    trade_price: Decimal
+    timestamp: int
+    candle_acc_trade_price: Decimal
+    candle_acc_trade_volume: Decimal
 
-    Ie say we only set trusted_contact.given_name instead of generating a dict like:
-        {contact: {city: None, country: None...}, etc}
-    we generate just:
-        {trusted_contact:{given_name: "new value"}}
+    @field_validator("market", mode="before", check_fields=False)
+    def validate_market(cls, value):
+        if isinstance(value, str):
+            return Market.from_string(value)
+        return value
 
-    NOTE: This function recurses to handle nested models, so do not use on a self-referential model
+    @field_validator(
+        "candle_date_time_utc",
+        "candle_date_time_kst",
+        mode="before",
+        check_fields=False,
+    )
+    def validate_datetime(cls, value):
+        if isinstance(value, str):
+            return parse_datetime(value)
+        return value
 
-    Returns:
-        dict: a dict containing any set fields
-    """
+    def __iter__(self):
+        """Convert attributes to dict, ensuring custom classes are serialized."""
+        d = self.__dict__.copy()
+        d["market"] = self.market.to_dict()  # Convert custom class to dict
+        return iter(d.items())
 
-    def map_values(val: Any) -> Any:
-        """
-        Some types have issues being json encoded, we convert them here to be encodable
+    def df(self) -> "pd.DataFrame":
+        import pandas as pd
 
-        also handles nested models and lists
-        """
+        return pd.DataFrame([clean_and_format_data(self.__dict__)])
 
-        if isinstance(val, UUID):
-            return str(val)
 
-        if isinstance(val, NonEmptyRequest):
-            return val.to_request_fields()
+class MinuteCandle(Candle):
+    unit: TimeUnit
 
-        if isinstance(val, dict):
-            return {k: map_values(v) for k, v in val.items()}
+    @field_validator("unit", mode="before", check_fields=False)
+    def validate_timeunit(cls, value):
+        if isinstance(value, int):
+            return TimeUnit(value)
+        return value
 
-        if isinstance(val, list):
-            return [map_values(v) for v in val]
 
-        # RFC 3339
-        if isinstance(val, datetime):
-            # if the datetime is naive, assume it's UTC
-            # https://docs.python.org/3/library/datetime.html#determining-if-an-object-is-aware-or-naive
-            if val.tzinfo is None or val.tzinfo.utcoffset(val) is None:
-                val = val.replace(tzinfo=timezone.utc)
-            return val.isoformat()
+class DayCandle(Candle):
+    prev_closing_price: Decimal
+    change_price: Decimal
+    change_rate: Decimal
+    converted_trade_price: Optional[Decimal] = None
 
-        if isinstance(val, date):
-            return val.isoformat()
 
-        if isinstance(val, IPv4Address):
-            return str(val)
+class WeekCandle(Candle):
+    first_day_of_period: date
 
-        if isinstance(val, IPv6Address):
-            return str(val)
+    @field_validator("first_day_of_period", mode="before", check_fields=False)
+    def validate_date(cls, value):
+        if isinstance(value, str):
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        return value
 
-        return val
 
-    d = self.model_dump(exclude_none=True)
-    if "symbol_or_symbols" in d:
-        s = d["symbol_or_symbols"]
-        if isinstance(s, list):
-            s = ",".join(s)
-        d["symbols"] = s
-        del d["symbol_or_symbols"]
+class MonthCandle(Candle):
+    first_day_of_period: date
 
-    # pydantic almost has what we need by passing exclude_none to dict() but it returns:
-    #  {trusted_contact: {}, contact: {}, identity: None, etc}
-    # so we do a simple list comprehension to filter out None and {}
-    return {
-        key: map_values(val)
-        for key, val in d.items()
-        if val is not None and val != {} and len(str(val)) > 0
-    }
+    @field_validator("first_day_of_period", mode="before", check_fields=False)
+    def validate_date(cls, value):
+        if isinstance(value, str):
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        return value
+
+
+T = TypeVar("T", bound="Candle")
+
+
+class Candles(Generic[T], list[T]):
+    def df(self) -> "pd.DataFrame":
+        import pandas as pd
+
+        return pd.concat([c.df() for c in self], ignore_index=True)
+
+
+class MinuteCandles(Candles[MinuteCandle]):
+    """A strongly-typed collection of only MinuteCandle objects."""
+
+    pass  # Inherits df() method from Candles, but now restricted to MinuteCandle
+
+
+class DayCandles(Candles[DayCandle]):
+    """A strongly-typed collection of only DayCandle objects."""
+
+    pass
+
+
+class WeekCandles(Candles[WeekCandle]):
+    """A strongly-typed collection of only WeekCandle objects."""
+
+    pass
+
+
+class MonthCandles(Candles[MonthCandle]):
+    """A strongly-typed collection of only MonthCandle objects."""
+
+    pass

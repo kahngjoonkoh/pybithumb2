@@ -6,6 +6,11 @@
 ---
 Bithumb API 2.0 wrapper for Python environments using Pydantic models and the python typing library to enhance developer experience.
 
+## nNotes
+I am currently using locals() to supply my parameters. Hence the param names where 1 to 1 matched with the API despite the API having slight unmatches. e.g. convertingPriceUnit
+The API could ahve a single datetime format?
+v2.1.0
+fUture update for 2.1.5
 ## Installation
 `pip install pybithumb2`
 

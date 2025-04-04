@@ -70,6 +70,7 @@ class RESTClient(ABC):
             print(url)
 
         response = self._session.request(method, url, **opts)
+
         try:
             response.raise_for_status()
         except HTTPError as http_error:
@@ -77,7 +78,11 @@ class RESTClient(ABC):
             raise APIError(error, http_error)
 
         if response.text != "":
-            return response.json()
+            obj = response.json()
+            if "error" in obj:
+                """Sometimes the response is an error but with a success status code."""
+                raise APIError(obj["error"])
+            return obj
         else:
             raise APIError("Response is empty")
 
