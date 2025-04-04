@@ -18,6 +18,8 @@ from pybithumb2.models import (
     Snapshot,
     OrderBook,
     WarningMarketInfo,
+    WalletStatus,
+    APIKeyInfo
 )
 from pybithumb2.rest import RESTClient
 from pybithumb2.exceptions import APIError
@@ -197,3 +199,20 @@ class BithumbClient(RESTClient):
             return response
 
         return [Account.model_validate(item) for item in response]
+
+    def get_wallet_status(self) -> Union[DFList[WalletStatus], RawData]:
+        response = self.get("/v1/status/wallet", is_private=True)
+
+        if self._use_raw_data:
+            return response
+
+        return DFList[WalletStatus]([WalletStatus.model_validate(item) for item in response])
+    
+    def get_api_keys(self) -> Union[DFList[APIKeyInfo], RawData]:
+        response = self.get("/v1/api_keys", is_private=True)
+
+        if self._use_raw_data:
+            return response
+
+        return DFList[APIKeyInfo]([APIKeyInfo.model_validate(item) for item in response])
+    

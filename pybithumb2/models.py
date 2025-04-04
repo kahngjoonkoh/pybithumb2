@@ -8,10 +8,16 @@ from typing import (
 )
 from dataclasses import dataclass
 from decimal import Decimal
-from pydantic import BaseModel, GetCoreSchemaHandler, ConfigDict, Field, field_validator
-from pydantic_core import core_schema
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from pybithumb2.types import ChangeType, TradeSide, MarketWarning, WarningType
+from pybithumb2.types import (
+    ChangeType,
+    TradeSide,
+    MarketWarning,
+    WarningType,
+    WalletState,
+    BlockState,
+)
 from pybithumb2.utils import parse_datetime, clean_and_format_data
 from pybithumb2.constants import (
     DATE_FORMAT,
@@ -302,10 +308,6 @@ class OrderBookUnit(FormattableBaseModel):
 에 단일 마켓 코드만 입력 시 orderbook_units 리스트에 
 30호가까지의 정보를 제공합니다."""
 
-# class OrderBookUnits(DFList[OrderBookUnit]):
-#     def __get_pydantic_core_schema__(self, handler: GetCoreSchemaHandler):
-#         inner_schema = handler.generate_schema(OrderBookUnit)  # Only allow OrderBookUnit
-#         return core_schema.list_schema(inner_schema)
 
 class OrderBook(FormattableBaseModel):
     market: Market
@@ -320,20 +322,26 @@ class OrderBook(FormattableBaseModel):
     @property
     def orderbook_units(self) -> DFList[OrderBookUnit]:
         return self.__dict__["orderbook_units"]
-    
+
     @field_validator("market", mode="before", check_fields=False)
     def validate_market(cls, value):
         if isinstance(value, str):
             return Market.from_string(value)
         return value
-    
+
     @field_validator("orderbook_units", mode="before", check_fields=False)
     def validate_orderbook_units(cls, value):
         if isinstance(value, list):
-            return [OrderBookUnit.model_validate(v) if isinstance(v, dict) else v for v in value]
-        raise ValueError("orderbook_units must be a list of OrderBookUnit or dict representations.")
+            return [
+                OrderBookUnit.model_validate(v) if isinstance(v, dict) else v
+                for v in value
+            ]
+        raise ValueError(
+            "orderbook_units must be a list of OrderBookUnit or dict representations."
+        )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
 
 class WarningMarketInfo(FormattableBaseModel):
     market: Market
@@ -360,3 +368,41 @@ class Account(FormattableBaseModel):
     avg_buy_price: Decimal
     avg_buy_price_modified: bool = True
     unit_currency: Currency
+
+
+@dataclass(frozen=True)
+class NetworkType:
+    code: str
+
+    def __post_init__(self):
+        object.__setattr__(self, "code", self.code.upper())
+
+    def __str__(self) -> str:
+        return self.code
+
+
+class WalletStatus(FormattableBaseModel):
+    currency: Currency
+    wallet_state: WalletState
+    block_state: BlockState
+    block_height: int = 0
+    block_updated_at: datetime
+    block_elapsed_minutes: int = 0
+    net_type: NetworkType
+    network_name: str
+
+    @field_validator("block_updated_at", mode="before", check_fields=False)
+    def validate_datetime(cls, value):
+        if isinstance(value, str):
+            return parse_datetime(value)
+        return value
+
+class APIKeyInfo(FormattableBaseModel):
+    access_key: str
+    expire_at: datetime
+
+    @field_validator("expire_at", mode="before", check_fields=False)
+    def validate_datetime(cls, value):
+        if isinstance(value, str):
+            return parse_datetime(value)
+        return value

@@ -1,5 +1,6 @@
 from typing import Any
 from datetime import datetime, time
+from dateutil import parser
 
 from pybithumb2.constants import (
     TIME_FORMAT,
@@ -47,5 +48,11 @@ def parse_datetime(datetime_str: str) -> datetime:
             return datetime.strptime(datetime_str, fmt)
         except ValueError:
             continue
+    
+    # Fallback for timezone-aware formats
+    try:
+        return parser.parse(datetime_str)  # Handles `+09:00` automatically
+    except ValueError:
+        pass
 
     raise ValueError(f"Invalid datetime format: {datetime_str}")

@@ -11,6 +11,8 @@ load_dotenv()
 API_KEY = os.getenv("API_KEY_ID")
 API_SECRET = os.getenv("API_SECRET_KEY")
 
+if not API_KEY or not API_SECRET:
+    raise ValueError("Missing API credentials. Check your .env file.")
 
 @pytest.fixture(scope="session")
 def api_client():

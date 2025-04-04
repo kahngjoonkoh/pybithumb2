@@ -47,3 +47,16 @@ class WarningType(FormattableEnum):
     PRICE_DIFFERENCE_HIGH = "PRICE_DIFFERENCE_HIGH"
     SPECIFIC_ACCOUNT_HIGH_TRANSACTION = "SPECIFIC_ACCOUNT_HIGH_TRANSACTION"
     EXCHANGE_TRADING_CONCENTRATION = "EXCHANGE_TRADING_CONCENTRATION"
+
+
+class WalletState(FormattableEnum):
+    WORKING = "working"
+    WITHDRAW_ONLY  = "withdraw_only"
+    DEPOSIT_ONLY = "deposit_only"
+    PAUSED = "paused"
+
+
+class BlockState(FormattableEnum):
+    NORMAL = "normal"
+    DELAYED = "delayed"
+    INACTIVE = "inactive"
