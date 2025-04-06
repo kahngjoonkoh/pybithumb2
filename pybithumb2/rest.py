@@ -33,6 +33,7 @@ class RESTClient(ABC):
         path: str,
         is_private: bool,
         data: Optional[Union[dict, str]] = None,
+        doseq: bool = False,
     ) -> HTTPResult:
         """Prepares and submits HTTP requests to given API endpoint and returns response.
         Handles retrying if 429 (Rate Limit) error arises.
@@ -50,7 +51,7 @@ class RESTClient(ABC):
             raise APIError("invalid_jwt")
 
         url: str = self._base_url + path
-        query = urlencode(data) if data is not None else None
+        query = urlencode(data, doseq) if data is not None else None
 
         headers = self._generate_headers(is_private, query)
 
@@ -71,7 +72,7 @@ class RESTClient(ABC):
 
         response = self._session.request(method, url, **opts)
 
-        # print(response.text)
+        print(response.text)
         try:
             response.raise_for_status()
         except HTTPError as http_error:
@@ -106,11 +107,15 @@ class RESTClient(ABC):
 
         jwt_token = jwt.encode(payload, self._secret_key)
         authorization_token = f"Bearer {jwt_token}"
-
+        print(authorization_token)
         return {"Authorization": authorization_token}
 
     def get(
-        self, path: str, is_private: bool, data: Optional[Union[dict, str]] = None
+        self,
+        path: str,
+        is_private: bool,
+        data: Optional[Union[dict, str]] = None,
+        doseq: bool = False,
     ) -> HTTPResult:
         """Performs a single GET request
 
@@ -122,13 +127,14 @@ class RESTClient(ABC):
         Returns:
             dict: The response
         """
-        return self._request("GET", path, is_private, data)
+        return self._request("GET", path, is_private, data, doseq)
 
     def post(
         self,
         path: str,
         is_private: bool,
         data: Optional[Union[dict, List[dict]]] = None,
+        doseq: bool = False,
     ) -> HTTPResult:
         """Performs a single POST request
 
@@ -140,9 +146,15 @@ class RESTClient(ABC):
         Returns:
             dict: The response
         """
-        return self._request("POST", path, is_private, data)
+        return self._request("POST", path, is_private, data, doseq)
 
-    def put(self, path: str, is_private: bool, data: Optional[dict] = None) -> dict:
+    def put(
+        self,
+        path: str,
+        is_private: bool,
+        data: Optional[dict] = None,
+        doseq: bool = False,
+    ) -> dict:
         """Performs a single PUT request
 
         Args:
@@ -153,9 +165,15 @@ class RESTClient(ABC):
         Returns:
             dict: The response
         """
-        return self._request("PUT", path, is_private, data)
+        return self._request("PUT", path, is_private, data, doseq)
 
-    def patch(self, path: str, is_private: bool, data: Optional[dict] = None) -> dict:
+    def patch(
+        self,
+        path: str,
+        is_private: bool,
+        data: Optional[dict] = None,
+        doseq: bool = False,
+    ) -> dict:
         """Performs a single PATCH request
 
         Args:
@@ -166,10 +184,14 @@ class RESTClient(ABC):
         Returns:
             dict: The response
         """
-        return self._request("PATCH", path, is_private, data)
+        return self._request("PATCH", path, is_private, data, doseq)
 
     def delete(
-        self, path, is_private: bool, data: Optional[Union[dict, str]] = None
+        self,
+        path,
+        is_private: bool,
+        data: Optional[Union[dict, str]] = None,
+        doseq: bool = False,
     ) -> dict:
         """Performs a single DELETE request
 
@@ -180,4 +202,4 @@ class RESTClient(ABC):
         Returns:
             dict: The response
         """
-        return self._request("DELETE", path, is_private, data)
+        return self._request("DELETE", path, is_private, data, doseq)

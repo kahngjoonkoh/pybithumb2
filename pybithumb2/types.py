@@ -108,3 +108,7 @@ class OrderID:
 
     def __str__(self) -> str:
         return self.id
+
+class OrderBy(FormattableEnum):
+    ASC = "asc"
+    DESC = "desc"

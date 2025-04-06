@@ -4,6 +4,7 @@
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache
 
 # Ignore __pycache__ directories
 __pycache__/

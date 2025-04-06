@@ -1,8 +1,8 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Set
 from datetime import datetime, time
 
 from pybithumb2.__env__ import API_BASE_URL
-from pybithumb2.types import RawData, Currency, OrderID
+from pybithumb2.types import RawData, Currency, OrderID, OrderState, OrderBy
 from pybithumb2.models import (
     Account,
     DFList,
@@ -18,9 +18,10 @@ from pybithumb2.models import (
     OrderBook,
     OrderAvailable,
     OrderInfo,
+    Order,
     WarningMarketInfo,
     WalletStatus,
-    APIKeyInfo
+    APIKeyInfo,
 )
 from pybithumb2.rest import RESTClient
 from pybithumb2.exceptions import APIError
@@ -158,7 +159,9 @@ class BithumbClient(RESTClient):
 
         return DFList[TradeInfo]([TradeInfo.model_validate(item) for item in response])
 
-    def get_snapshots(self, markets: List[MarketID]) -> Union[DFList[Snapshot], RawData]:
+    def get_snapshots(
+        self, markets: List[MarketID]
+    ) -> Union[DFList[Snapshot], RawData]:
         data = locals().copy()
         data.pop("self")
         data = clean_and_format_data(data)
@@ -205,19 +208,21 @@ class BithumbClient(RESTClient):
         data = locals().copy()
         data.pop("self")
         data = clean_and_format_data(data)
-        
+
         response = self.get("/v1/orders/chance", is_private=True, data=data)
 
         if self._use_raw_data:
             return response
 
         return OrderAvailable.model_validate(response)
-    
-    def get_order_info(self, uuid: Optional[OrderID] = None) -> Union[DFList[OrderInfo], RawData]:
+
+    def get_order_info(
+        self, uuid: Optional[OrderID] = None
+    ) -> Union[DFList[OrderInfo], RawData]:
         data = locals().copy()
         data.pop("self")
         data = clean_and_format_data(data)
-        
+
         response = self.get("/v1/orders", is_private=True, data=data)
 
         if self._use_raw_data:
@@ -225,19 +230,50 @@ class BithumbClient(RESTClient):
 
         return DFList[OrderInfo]([OrderInfo.model_validate(item) for item in response])
 
+    def get_orders(
+        self,
+        market: MarketID,
+        uuids: Optional[List[OrderID]] = None,
+        state: Optional[OrderState] = None,
+        states: Optional[Set[OrderState]] = None,
+        page: int = 1,
+        limit: int = 100,
+        order_by: OrderBy = OrderBy.DESC
+    ) -> Union[DFList[Order], RawData]: 
+        if states:
+            if state:
+                raise AssertionError("You can not have both state and states parameter")
+
+        data = locals().copy()
+        data.pop("self")
+        data.pop("uuids")
+        data = clean_and_format_data(data)
+        if uuids:
+            data["uuids"] = [str(u.id) for u in uuids]
+        
+        response = self.get("/v1/orders", is_private=True, data=data, doseq=True)
+
+        if self._use_raw_data:
+            return response
+
+        return DFList[Order]([Order.model_validate(item) for item in response])
+
     def get_wallet_status(self) -> Union[DFList[WalletStatus], RawData]:
         response = self.get("/v1/status/wallet", is_private=True)
 
         if self._use_raw_data:
             return response
 
-        return DFList[WalletStatus]([WalletStatus.model_validate(item) for item in response])
-    
+        return DFList[WalletStatus](
+            [WalletStatus.model_validate(item) for item in response]
+        )
+
     def get_api_keys(self) -> Union[DFList[APIKeyInfo], RawData]:
         response = self.get("/v1/api_keys", is_private=True)
 
         if self._use_raw_data:
             return response
 
-        return DFList[APIKeyInfo]([APIKeyInfo.model_validate(item) for item in response])
-    
+        return DFList[APIKeyInfo](
+            [APIKeyInfo.model_validate(item) for item in response]
+        )
