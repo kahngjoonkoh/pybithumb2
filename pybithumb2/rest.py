@@ -4,7 +4,7 @@ import time
 import hashlib
 
 from abc import ABC
-from typing import Any, List, Optional, Union
+from typing import List, Optional, Union
 from requests import Session, HTTPError
 from urllib.parse import urlencode
 
@@ -35,14 +35,16 @@ class RESTClient(ABC):
         data: Optional[Union[dict, str]] = None,
         doseq: bool = False,
     ) -> HTTPResult:
-        """Prepares and submits HTTP requests to given API endpoint and returns response.
-        Handles retrying if 429 (Rate Limit) error arises.
+        """
+        Prepares and submits HTTP requests to given API endpoint and returns response.
 
         Args:
             method (str): The API endpoint HTTP method
+            is_private (bool): Whether the request should use authentication headers.
             path (str): The API endpoint path
-            data (Optional[Union[dict, str]]): Either the payload in json format, query params urlencoded, or a dict
+            data (Union[dict, str], optional): Either the payload in json format, query params urlencoded, or a dict
              of values to be converted to appropriate format based on `method`. Defaults to None.
+            doseq (bool): Whether list should be expanded into multiple parameters. Defaults to False.
 
         Returns:
             HTTPResult: The response from the API
@@ -65,14 +67,13 @@ class RESTClient(ABC):
         else:
             opts["json"] = data
 
-        if query:
-            print(f"{url}?{query}")
-        else:
-            print(url)
+        # if query:
+        #     print(f"{url}?{query}")
+        # else:
+        #     print(url)
 
         response = self._session.request(method, url, **opts)
 
-        print(response.text)
         try:
             response.raise_for_status()
         except HTTPError as http_error:
@@ -88,8 +89,18 @@ class RESTClient(ABC):
         else:
             raise APIError("Response is empty")
 
-    # Query is the str after ?
     def _generate_headers(self, is_private: bool, query: Optional[str]) -> dict:
+        """
+        Generates the appropriate HTTP headers for the API request.
+
+        Args:
+            is_private (bool): Whether the request requires authentication.
+            query (str, optional): The query string (the part after '?') used in the request. Required to generate
+                query hash for authenticated private requests.
+
+        Returns:
+            dict: A dictionary containing HTTP headers, including Authorization if private.
+        """
         if not is_private:
             return {"accept": "application/json"}
         # Generate access token
@@ -107,7 +118,7 @@ class RESTClient(ABC):
 
         jwt_token = jwt.encode(payload, self._secret_key)
         authorization_token = f"Bearer {jwt_token}"
-        print(authorization_token)
+
         return {"Authorization": authorization_token}
 
     def get(
@@ -117,12 +128,14 @@ class RESTClient(ABC):
         data: Optional[Union[dict, str]] = None,
         doseq: bool = False,
     ) -> HTTPResult:
-        """Performs a single GET request
+        """
+        Performs a single GET request
 
         Args:
             path (str): The API endpoint path
-            data (Union[dict, str], optional): Query parameters to send, either
-            as a str urlencoded, or a dict of values to be converted. Defaults to None.
+            is_private (bool): Whether the request should use authentication headers.
+            data (Union[dict, str], optional): Query parameters to send. Defaults to None.
+            doseq (bool): Whether list should be expanded into multiple parameters. Defaults to False.
 
         Returns:
             dict: The response
@@ -136,12 +149,14 @@ class RESTClient(ABC):
         data: Optional[Union[dict, List[dict]]] = None,
         doseq: bool = False,
     ) -> HTTPResult:
-        """Performs a single POST request
+        """
+        Performs a single POST request
 
         Args:
             path (str): The API endpoint path
-            data (Optional[Union[dict, List[dict]]): The json payload as a dict of values to be converted.
-             Defaults to None.
+            is_private (bool): Whether the request should use authentication headers.
+            data (Union[dict, str], optional): The json payload as a dict of values to be converted. Defaults to None.
+            doseq (bool): Whether list should be expanded into multiple parameters. Defaults to False.
 
         Returns:
             dict: The response
@@ -155,12 +170,14 @@ class RESTClient(ABC):
         data: Optional[dict] = None,
         doseq: bool = False,
     ) -> dict:
-        """Performs a single PUT request
+        """
+        Performs a single PUT request
 
         Args:
             path (str): The API endpoint path
-            data (Optional[dict]): The json payload as a dict of values to be converted.
-             Defaults to None.
+            is_private (bool): Whether the request should use authentication headers.
+            data (Union[dict, str], optional): The json payload as a dict of values to be converted. Defaults to None.
+            doseq (bool): Whether list should be expanded into multiple parameters. Defaults to False.
 
         Returns:
             dict: The response
@@ -174,12 +191,14 @@ class RESTClient(ABC):
         data: Optional[dict] = None,
         doseq: bool = False,
     ) -> dict:
-        """Performs a single PATCH request
+        """
+        Performs a single PATCH request
 
         Args:
             path (str): The API endpoint path
-            data (Optional[dict]): The json payload as a dict of values to be converted.
-             Defaults to None.
+            is_private (bool): Whether the request should use authentication headers.
+            data (Union[dict, str], optional): The json payload as a dict of values to be converted. Defaults to None.
+            doseq (bool): Whether list should be expanded into multiple parameters. Defaults to False.
 
         Returns:
             dict: The response
@@ -193,11 +212,14 @@ class RESTClient(ABC):
         data: Optional[Union[dict, str]] = None,
         doseq: bool = False,
     ) -> dict:
-        """Performs a single DELETE request
+        """
+        Performs a single DELETE request
 
         Args:
             path (str): The API endpoint path
-            data (Union[dict, str], optional): The payload if any. Defaults to None.
+            is_private (bool): Whether the request should use authentication headers.
+            data (Union[dict, str], optional): Query parameters to send. Defaults to None.
+            doseq (bool): Whether list should be expanded into multiple parameters. Defaults to False.
 
         Returns:
             dict: The response
