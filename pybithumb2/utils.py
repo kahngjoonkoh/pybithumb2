@@ -1,6 +1,7 @@
 from typing import Any
 from datetime import datetime, time
 from dateutil import parser
+from decimal import Decimal
 
 from pybithumb2.constants import (
     TIME_FORMAT,
@@ -34,9 +35,9 @@ def clean_and_format_data(data: dict) -> dict:
             if val.tzinfo is None or val.tzinfo.utcoffset(val) is None:
                 val = val.replace(tzinfo=KST)
             return val.strftime(DATETIME_FORMAT)
-        
-        # elif isinstance(val, (int, float)):
-        #     return val
+
+        elif isinstance(val, (int, float, Decimal)):
+            return val
 
         return str(val)
 
@@ -44,6 +45,7 @@ def clean_and_format_data(data: dict) -> dict:
 
 
 def parse_datetime(datetime_str: str) -> datetime:
+    """Handles datetime fields inconsistencies across endpoints"""
     formats = [DATETIME_FORMAT, DATETIME_FORMAT_T, DATETIME_FORMAT_TZ]
 
     for fmt in formats:
@@ -51,7 +53,7 @@ def parse_datetime(datetime_str: str) -> datetime:
             return datetime.strptime(datetime_str, fmt)
         except ValueError:
             continue
-    
+
     # Fallback for timezone-aware formats
     try:
         return parser.parse(datetime_str)  # Handles `+09:00` automatically

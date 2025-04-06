@@ -47,9 +47,7 @@ def test_get_day_candles(api_client: BithumbClient):
         getattr(test_item, "converted_trade_price")
 
 
-def test_get_day_candles_with_converting_price_unit(
-    api_client: BithumbClient
-):
+def test_get_day_candles_with_converting_price_unit(api_client: BithumbClient):
     now = datetime.now()
     market: MarketID = MarketID.from_string("BTC-ETH")
     response = api_client.get_day_candles(

@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pybithumb2"
-description = "Bithumb API 2.0 wrapper for Python environments using Pydantic models"
+description = "PyBithumb2 is a Python wrapper for Bithumb's API v2, designed to provide an intuitive and efficient interface for developers. By leveraging Pydantic models and Python's typing library, PyBithumb2 ensures data validation and enhances the development experience."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
@@ -44,10 +44,11 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "pydantic==2.11.1",
+    "pydantic==2.11.2",
     "PyJWT==2.10.1",
     "pytest==8.3.2",
     "python-dotenv==1.1.0",
+    "python_dateutil==2.9.0.post0",
     "Requests==2.32.3"
 ]
 dynamic = [

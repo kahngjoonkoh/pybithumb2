@@ -2,7 +2,7 @@ import sys
 
 API_BASE_URL = "https://api.bithumb.com"
 
-VERSION = "0.0.1.dev0"
+VERSION = "1.0.0-beta"
 
 USER_AGENT = f"pybithumb2/{VERSION}"
 

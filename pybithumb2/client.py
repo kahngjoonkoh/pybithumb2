@@ -1,8 +1,17 @@
 from typing import List, Optional, Union, Set
 from datetime import datetime, time
+from decimal import Decimal
 
 from pybithumb2.__env__ import API_BASE_URL
-from pybithumb2.types import RawData, Currency, OrderID, OrderState, OrderBy
+from pybithumb2.types import (
+    RawData,
+    Currency,
+    OrderID,
+    OrderState,
+    OrderType,
+    OrderBy,
+    TradeSide,
+)
 from pybithumb2.models import (
     Account,
     DFList,
@@ -35,18 +44,29 @@ class BithumbClient(RESTClient):
         secret_key: Optional[str] = None,
         use_raw_data: bool = False,
     ) -> None:
-        """Instantiates the Bithumb Client.
+        """
+        Instantiates the Bithumb Client.
         If either key is missing, then the client will only have access to the public API.
 
         Args:
-            api_key (Optional[str]): The API key for the client.
-            secret_key (Optional[str]): The secret key for the client.
+            api_key (str, optional): The API key for the client.
+            secret_key (str, optional): The secret key for the client.
             use_raw_data (bool): Whether the API response is returned as raw data or in pydantic models.
         """
         super().__init__(API_BASE_URL, api_key, secret_key, use_raw_data)
 
     # ##### Public API features #####
     def get_markets(self, isDetails: bool = False) -> Union[List[Market], RawData]:
+        """
+        Instantiates the Bithumb Client.
+        If either key is missing, then the client will only have access to the public API.
+
+        Args:
+            isDetails (bool): Whether the API response is returned as raw data or in pydantic models. Defaults to False.
+
+        Returns:
+            Union[List[Market], RawData]
+        """
         data = locals().copy()
         data.pop("self")
         data = clean_and_format_data(data)
@@ -238,8 +258,8 @@ class BithumbClient(RESTClient):
         states: Optional[Set[OrderState]] = None,
         page: int = 1,
         limit: int = 100,
-        order_by: OrderBy = OrderBy.DESC
-    ) -> Union[DFList[Order], RawData]: 
+        order_by: OrderBy = OrderBy.DESC,
+    ) -> Union[DFList[Order], RawData]:
         if states:
             if state:
                 raise AssertionError("You can not have both state and states parameter")
@@ -250,13 +270,43 @@ class BithumbClient(RESTClient):
         data = clean_and_format_data(data)
         if uuids:
             data["uuids"] = [str(u.id) for u in uuids]
-        
+
         response = self.get("/v1/orders", is_private=True, data=data, doseq=True)
 
         if self._use_raw_data:
             return response
 
         return DFList[Order]([Order.model_validate(item) for item in response])
+
+    def cancel_order(self, uuid: OrderID) -> Union[Order, RawData]:
+        data = locals().copy()
+        data.pop("self")
+        data = clean_and_format_data(data)
+
+        response = self.delete("/v1/order", is_private=True, data=data)
+
+        if self._use_raw_data:
+            return response
+        return Order.model_validate(response)
+
+    def submit_order(
+        self,
+        market: MarketID,
+        side: TradeSide,
+        volume: Decimal,
+        price: Decimal,
+        ord_type: OrderType,
+    ) -> Union[Order, RawData]:
+        data = locals().copy()
+        data.pop("self")
+        data = clean_and_format_data(data)
+
+        response = self.post("/v1/orders", is_private=True, data=data)
+
+        if self._use_raw_data:
+            return response
+
+        return Order.model_validate(response)
 
     def get_wallet_status(self) -> Union[DFList[WalletStatus], RawData]:
         response = self.get("/v1/status/wallet", is_private=True)

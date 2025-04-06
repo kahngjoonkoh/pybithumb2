@@ -2,8 +2,13 @@ from pybithumb2.client import BithumbClient
 from pybithumb2.models import MarketID, OrderBook
 
 
-def test_get_orderbooks(api_client: BithumbClient,):
-    markets: list[MarketID] = [MarketID.from_string("KRW-BTC"), MarketID.from_string("KRW-ETH")]
+def test_get_orderbooks(
+    api_client: BithumbClient,
+):
+    markets: list[MarketID] = [
+        MarketID.from_string("KRW-BTC"),
+        MarketID.from_string("KRW-ETH"),
+    ]
     response = api_client.get_orderbooks(markets)
 
     assert len(response) > 0

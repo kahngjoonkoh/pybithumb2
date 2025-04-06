@@ -6,9 +6,8 @@ from typing import (
     List,
     TYPE_CHECKING,
 )
-from dataclasses import dataclass
 from decimal import Decimal
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from pybithumb2.types import (
     Currency,
@@ -22,7 +21,7 @@ from pybithumb2.types import (
     MarketState,
     WalletState,
     BlockState,
-    NetworkType
+    NetworkType,
 )
 from pybithumb2.utils import parse_datetime, clean_and_format_data
 from pybithumb2.constants import (
@@ -86,7 +85,6 @@ class FormattableBaseModel(BaseModel, DataFramable):
 
     def __str__(self) -> str:
         return self.__repr__()
-
 
 
 class MarketID(FormattableBaseModel):
@@ -235,9 +233,6 @@ class TradeInfo(FormattableBaseModel):
         return value
 
 
-"""*위 응답의 change, change_price, change_rate, signed_change_price, signed_change_rate 필드는 전일종가의 대비 값입니다."""
-
-
 class Snapshot(FormattableBaseModel):
     market: MarketID
     trade_date: date
@@ -299,12 +294,6 @@ class OrderBookUnit(FormattableBaseModel):
     bid_size: Decimal = Field(default_factory=lambda: Decimal(0))
 
 
-"""orderbook_units 리스트에는 15호가 정보를 차례대로
-(1호가, 2호가 ... 15호가) 담고 있습니다. 단, market
-에 단일 마켓 코드만 입력 시 orderbook_units 리스트에 
-30호가까지의 정보를 제공합니다."""
-
-
 class OrderBook(FormattableBaseModel):
     market: MarketID
     timestamp: int = 0
@@ -324,7 +313,7 @@ class OrderBook(FormattableBaseModel):
         if isinstance(value, str):
             return MarketID.from_string(value)
         return value
-    
+
 
 class WarningMarketInfo(FormattableBaseModel):
     market: MarketID
@@ -409,19 +398,18 @@ class Order(FormattableBaseModel):
         if isinstance(value, str):
             return MarketID.from_string(value)
         return value
-    
+
     @field_validator("created_at", mode="before", check_fields=False)
     def validate_datetime(cls, value):
         if isinstance(value, str):
             return parse_datetime(value)
         return value
-    
+
     @field_validator("side", mode="before", check_fields=False)
     def normalize_side(cls, v):
         if isinstance(v, str):
             return TradeSide(v.upper())
         return v
-
 
 
 class Trade(FormattableBaseModel):
@@ -438,13 +426,13 @@ class Trade(FormattableBaseModel):
         if isinstance(value, str):
             return MarketID.from_string(value)
         return value
-    
+
     @field_validator("created_at", mode="before", check_fields=False)
     def validate_datetime(cls, value):
         if isinstance(value, str):
             return parse_datetime(value)
         return value
-    
+
     @field_validator("side", mode="before", check_fields=False)
     def normalize_side(cls, v):
         if isinstance(v, str):
@@ -453,7 +441,7 @@ class Trade(FormattableBaseModel):
 
 
 class OrderInfo(Order):
-    trades : Optional[List[Trade]] = None
+    trades: Optional[List[Trade]] = None
 
 
 class WalletStatus(FormattableBaseModel):
@@ -482,9 +470,3 @@ class APIKeyInfo(FormattableBaseModel):
         if isinstance(value, str):
             return parse_datetime(value)
         return value
-
-class OrderID(FormattableBaseModel):
-    id: str
-
-    def __str__(self) -> str:
-        return f"{self.currency_from}-{self.currency_to}"
