@@ -10,7 +10,7 @@ from pybithumb2.models import (
     DayCandle,
     WeekCandle,
     MonthCandle,
-    Market,
+    MarketID,
 )
 from pybithumb2.types import RawData
 from pybithumb2.exceptions import APIError
@@ -18,7 +18,7 @@ from pybithumb2.exceptions import APIError
 
 def test_get_minute_candles(api_client: BithumbClient, raw_api_client: BithumbClient):
     now = datetime.now()
-    market: Market = Market.from_string("KRW-BTC")
+    market: MarketID = MarketID.from_string("KRW-BTC")
     response = api_client.get_minute_candles(market, to=now, count=10)
     raw_response = raw_api_client.get_minute_candles(market, to=now, count=10)
 
@@ -35,7 +35,7 @@ def test_get_minute_candles(api_client: BithumbClient, raw_api_client: BithumbCl
 
 def test_get_day_candles(api_client: BithumbClient):
     now = datetime.now()
-    market: Market = Market.from_string("KRW-BTC")
+    market: MarketID = MarketID.from_string("KRW-BTC")
     response = api_client.get_day_candles(market, to=now)
 
     assert len(response) > 0
@@ -51,7 +51,7 @@ def test_get_day_candles_with_converting_price_unit(
     api_client: BithumbClient
 ):
     now = datetime.now()
-    market: Market = Market.from_string("BTC-ETH")
+    market: MarketID = MarketID.from_string("BTC-ETH")
     response = api_client.get_day_candles(
         market, to=now, convertingPriceUnit=Currency("KRW")
     )
@@ -65,7 +65,7 @@ def test_get_day_candles_with_converting_price_unit(
 
 def test_get_week_candles(api_client: BithumbClient, raw_api_client: BithumbClient):
     now = datetime.now()
-    market: Market = Market.from_string("KRW-BTC")
+    market: MarketID = MarketID.from_string("KRW-BTC")
     response = api_client.get_week_candles(market, to=now)
     raw_response = raw_api_client.get_week_candles(market, to=now)
 
@@ -79,7 +79,7 @@ def test_get_week_candles(api_client: BithumbClient, raw_api_client: BithumbClie
 
 def test_get_week_candles(api_client: BithumbClient, raw_api_client: BithumbClient):
     now = datetime.now()
-    market: Market = Market.from_string("KRW-BTC")
+    market: MarketID = MarketID.from_string("KRW-BTC")
     response = api_client.get_month_candles(market, to=now)
     raw_response = raw_api_client.get_month_candles(market, to=now)
 
@@ -92,7 +92,7 @@ def test_get_week_candles(api_client: BithumbClient, raw_api_client: BithumbClie
 
 
 def test_fails_get_candles(api_client: BithumbClient):
-    market: Market = Market.from_string("KRW-BTC")
+    market: MarketID = MarketID.from_string("KRW-BTC")
     with pytest.raises(APIError):
         api_client.get_minute_candles(market, count=-1)
     with pytest.raises(APIError):

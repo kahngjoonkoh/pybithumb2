@@ -2,13 +2,12 @@ from typing import List, Optional, Union
 from datetime import datetime, time
 
 from pybithumb2.__env__ import API_BASE_URL
-from pybithumb2.types import RawData
+from pybithumb2.types import RawData, Currency, OrderID
 from pybithumb2.models import (
     Account,
-    Currency,
     DFList,
+    MarketID,
     Market,
-    MarketInfo,
     MinuteCandle,
     DayCandle,
     WeekCandle,
@@ -17,6 +16,8 @@ from pybithumb2.models import (
     TradeInfo,
     Snapshot,
     OrderBook,
+    OrderAvailable,
+    OrderInfo,
     WarningMarketInfo,
     WalletStatus,
     APIKeyInfo
@@ -44,7 +45,7 @@ class BithumbClient(RESTClient):
         super().__init__(API_BASE_URL, api_key, secret_key, use_raw_data)
 
     # ##### Public API features #####
-    def get_markets(self, isDetails: bool = False) -> Union[List[MarketInfo], RawData]:
+    def get_markets(self, isDetails: bool = False) -> Union[List[Market], RawData]:
         data = locals().copy()
         data.pop("self")
         data = clean_and_format_data(data)
@@ -54,11 +55,11 @@ class BithumbClient(RESTClient):
         if self._use_raw_data:
             return response
 
-        return [MarketInfo.model_validate(item) for item in response]
+        return [Market.model_validate(item) for item in response]
 
     def get_minute_candles(
         self,
-        market: Market,
+        market: MarketID,
         to: Optional[datetime] = None,
         count: int = 1,
         unit: TimeUnit = TimeUnit(1),
@@ -82,7 +83,7 @@ class BithumbClient(RESTClient):
 
     def get_day_candles(
         self,
-        market: Market,
+        market: MarketID,
         to: Optional[datetime] = None,
         count: int = 1,
         convertingPriceUnit: Optional[Currency] = None,
@@ -101,7 +102,7 @@ class BithumbClient(RESTClient):
         return DFList[DayCandle]([DayCandle.model_validate(item) for item in response])
 
     def get_week_candles(
-        self, market: Market, to: Optional[datetime] = None, count: int = 1
+        self, market: MarketID, to: Optional[datetime] = None, count: int = 1
     ) -> Union[DFList[WeekCandle], RawData]:
         if count <= 0 or count > 200:
             raise APIError("You can only request betwewen 1 and 200 candles")
@@ -119,7 +120,7 @@ class BithumbClient(RESTClient):
         )
 
     def get_month_candles(
-        self, market: Market, to: Optional[datetime] = None, count: int = 1
+        self, market: MarketID, to: Optional[datetime] = None, count: int = 1
     ) -> Union[DFList[MonthCandle], RawData]:
         if count <= 0 or count > 200:
             raise APIError("You can only request betwewen 1 and 200 candles")
@@ -138,7 +139,7 @@ class BithumbClient(RESTClient):
 
     def get_trades(
         self,
-        market: Market,
+        market: MarketID,
         to: Optional[time] = None,
         count: int = 1,
         # cursor: str, # No support for this yet. (I don't know what its supposed to do)
@@ -157,7 +158,7 @@ class BithumbClient(RESTClient):
 
         return DFList[TradeInfo]([TradeInfo.model_validate(item) for item in response])
 
-    def get_snapshots(self, markets: List[Market]) -> Union[DFList[Snapshot], RawData]:
+    def get_snapshots(self, markets: List[MarketID]) -> Union[DFList[Snapshot], RawData]:
         data = locals().copy()
         data.pop("self")
         data = clean_and_format_data(data)
@@ -170,7 +171,7 @@ class BithumbClient(RESTClient):
         return DFList[Snapshot]([Snapshot.model_validate(item) for item in response])
 
     def get_orderbooks(
-        self, markets: List[Market]
+        self, markets: List[MarketID]
     ) -> Union[List[OrderBook], RawData]:
         data = locals().copy()
         data.pop("self")
@@ -199,6 +200,30 @@ class BithumbClient(RESTClient):
             return response
 
         return [Account.model_validate(item) for item in response]
+
+    def get_order_available(self, market: MarketID) -> Union[OrderAvailable, RawData]:
+        data = locals().copy()
+        data.pop("self")
+        data = clean_and_format_data(data)
+        
+        response = self.get("/v1/orders/chance", is_private=True, data=data)
+
+        if self._use_raw_data:
+            return response
+
+        return OrderAvailable.model_validate(response)
+    
+    def get_order_info(self, uuid: Optional[OrderID] = None) -> Union[DFList[OrderInfo], RawData]:
+        data = locals().copy()
+        data.pop("self")
+        data = clean_and_format_data(data)
+        
+        response = self.get("/v1/orders", is_private=True, data=data)
+
+        if self._use_raw_data:
+            return response
+
+        return DFList[OrderInfo]([OrderInfo.model_validate(item) for item in response])
 
     def get_wallet_status(self) -> Union[DFList[WalletStatus], RawData]:
         response = self.get("/v1/status/wallet", is_private=True)

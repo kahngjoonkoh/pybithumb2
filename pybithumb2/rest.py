@@ -71,6 +71,7 @@ class RESTClient(ABC):
 
         response = self._session.request(method, url, **opts)
 
+        # print(response.text)
         try:
             response.raise_for_status()
         except HTTPError as http_error:

@@ -1,4 +1,5 @@
 from enum import Enum
+from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
 RawData = Dict[str, Any]
@@ -12,6 +13,17 @@ class FormattableEnum(Enum):
 
     def __str__(self):
         return self.value
+
+
+@dataclass(frozen=True)
+class Currency:
+    code: str
+
+    def __post_init__(self):
+        object.__setattr__(self, "code", self.code.upper())
+
+    def __str__(self) -> str:
+        return self.code
 
 
 class TradeSide(FormattableEnum):
@@ -49,9 +61,37 @@ class WarningType(FormattableEnum):
     EXCHANGE_TRADING_CONCENTRATION = "EXCHANGE_TRADING_CONCENTRATION"
 
 
+class OrderType(FormattableEnum):
+    LIMIT = "limit"
+    PRICE = "price"
+    MARKET = "market"
+
+
+class MarketState(FormattableEnum):
+    ACTIVE = "active"
+
+
+class OrderState(FormattableEnum):
+    WAIT = "wait"
+    WATCH = "watch"
+    DONE = "done"
+    CANCEL = "cancel"
+
+
+@dataclass(frozen=True)
+class NetworkType:
+    code: str
+
+    def __post_init__(self):
+        object.__setattr__(self, "code", self.code.upper())
+
+    def __str__(self) -> str:
+        return self.code
+
+
 class WalletState(FormattableEnum):
     WORKING = "working"
-    WITHDRAW_ONLY  = "withdraw_only"
+    WITHDRAW_ONLY = "withdraw_only"
     DEPOSIT_ONLY = "deposit_only"
     PAUSED = "paused"
 
@@ -60,3 +100,11 @@ class BlockState(FormattableEnum):
     NORMAL = "normal"
     DELAYED = "delayed"
     INACTIVE = "inactive"
+
+
+@dataclass(frozen=True)
+class OrderID:
+    id: str
+
+    def __str__(self) -> str:
+        return self.id

@@ -11,12 +11,18 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pybithumb2.types import (
+    Currency,
     ChangeType,
     TradeSide,
     MarketWarning,
     WarningType,
+    OrderID,
+    OrderType,
+    OrderState,
+    MarketState,
     WalletState,
     BlockState,
+    NetworkType
 )
 from pybithumb2.utils import parse_datetime, clean_and_format_data
 from pybithumb2.constants import (
@@ -82,23 +88,13 @@ class FormattableBaseModel(BaseModel, DataFramable):
         return self.__repr__()
 
 
-@dataclass(frozen=True)
-class Currency:
-    code: str
 
-    def __post_init__(self):
-        object.__setattr__(self, "code", self.code.upper())
-
-    def __str__(self) -> str:
-        return self.code
-
-
-class Market(FormattableBaseModel):
+class MarketID(FormattableBaseModel):
     currency_from: Currency
     currency_to: Currency
 
     @classmethod
-    def from_string(cls, market_str: str) -> "Market":
+    def from_string(cls, market_str: str) -> "MarketID":
         try:
             currency_from, currency_to = market_str.split("-")
             return cls(
@@ -112,8 +108,8 @@ class Market(FormattableBaseModel):
         return f"{self.currency_from}-{self.currency_to}"
 
 
-class MarketInfo(FormattableBaseModel):
-    market: Market
+class Market(FormattableBaseModel):
+    market: MarketID
     korean_name: str
     english_name: str
     market_warning: Optional[MarketWarning] = None
@@ -121,7 +117,7 @@ class MarketInfo(FormattableBaseModel):
     @field_validator("market", mode="before", check_fields=False)
     def validate_market(cls, value):
         if isinstance(value, str):
-            return Market.from_string(
+            return MarketID.from_string(
                 value
             )  # Convert "KRW-BTC" → Market(Currency("KRW"), Currency("BTC"))
         return value
@@ -142,7 +138,7 @@ class TimeUnit(FormattableBaseModel):
 
 
 class Candle(FormattableBaseModel):
-    market: Market
+    market: MarketID
     candle_date_time_utc: datetime
     candle_date_time_kst: datetime
     opening_price: Decimal = Field(default_factory=lambda: Decimal(0))
@@ -156,7 +152,7 @@ class Candle(FormattableBaseModel):
     @field_validator("market", mode="before", check_fields=False)
     def validate_market(cls, value):
         if isinstance(value, str):
-            return Market.from_string(value)
+            return MarketID.from_string(value)
         return value
 
     @field_validator(
@@ -209,7 +205,7 @@ class MonthCandle(Candle):
 
 
 class TradeInfo(FormattableBaseModel):
-    market: Market
+    market: MarketID
     trade_date_utc: date
     trade_time_utc: time
     timestamp: int = 0
@@ -223,7 +219,7 @@ class TradeInfo(FormattableBaseModel):
     @field_validator("market", mode="before", check_fields=False)
     def validate_market(cls, value):
         if isinstance(value, str):
-            return Market.from_string(value)
+            return MarketID.from_string(value)
         return value
 
     @field_validator("trade_date_utc", mode="before", check_fields=False)
@@ -243,7 +239,7 @@ class TradeInfo(FormattableBaseModel):
 
 
 class Snapshot(FormattableBaseModel):
-    market: Market
+    market: MarketID
     trade_date: date
     trade_time: time
     trade_date_kst: date
@@ -272,7 +268,7 @@ class Snapshot(FormattableBaseModel):
     @field_validator("market", mode="before", check_fields=False)
     def validate_market(cls, value):
         if isinstance(value, str):
-            return Market.from_string(value)
+            return MarketID.from_string(value)
         return value
 
     @field_validator("trade_date", "trade_date_kst", mode="before", check_fields=False)
@@ -310,7 +306,7 @@ class OrderBookUnit(FormattableBaseModel):
 
 
 class OrderBook(FormattableBaseModel):
-    market: Market
+    market: MarketID
     timestamp: int = 0
     total_ask_size: Decimal = Field(default_factory=lambda: Decimal(0))
     total_bid_size: Decimal = Field(default_factory=lambda: Decimal(0))
@@ -326,32 +322,19 @@ class OrderBook(FormattableBaseModel):
     @field_validator("market", mode="before", check_fields=False)
     def validate_market(cls, value):
         if isinstance(value, str):
-            return Market.from_string(value)
+            return MarketID.from_string(value)
         return value
-
-    @field_validator("orderbook_units", mode="before", check_fields=False)
-    def validate_orderbook_units(cls, value):
-        if isinstance(value, list):
-            return [
-                OrderBookUnit.model_validate(v) if isinstance(v, dict) else v
-                for v in value
-            ]
-        raise ValueError(
-            "orderbook_units must be a list of OrderBookUnit or dict representations."
-        )
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
+    
 
 class WarningMarketInfo(FormattableBaseModel):
-    market: Market
+    market: MarketID
     warning_type: WarningType
     end_date: datetime  # KST
 
     @field_validator("market", mode="before", check_fields=False)
     def validate_market(cls, value):
         if isinstance(value, str):
-            return Market.from_string(value)
+            return MarketID.from_string(value)
         return value
 
     @field_validator("end_date", mode="before", check_fields=False)
@@ -370,15 +353,107 @@ class Account(FormattableBaseModel):
     unit_currency: Currency
 
 
-@dataclass(frozen=True)
-class NetworkType:
-    code: str
+class OrderConstraint(FormattableBaseModel):
+    currency: Currency
+    price_unit: Decimal = Field(default_factory=lambda: Decimal(0.00000001))
+    min_total: Decimal
 
-    def __post_init__(self):
-        object.__setattr__(self, "code", self.code.upper())
 
-    def __str__(self) -> str:
-        return self.code
+class MarketInfo(FormattableBaseModel):
+    id: MarketID
+    name: str
+    order_types: List[OrderType]
+    ask_types: List[OrderType]
+    bid_types: List[OrderType]
+    bid: OrderConstraint
+    ask: OrderConstraint
+    max_total: Decimal
+    state: MarketState
+
+    @field_validator("id", mode="before", check_fields=False)
+    def validate_market(cls, value):
+        if isinstance(value, str):
+            return MarketID.from_string(value)
+        return value
+
+
+class OrderAvailable(FormattableBaseModel):
+    bid_fee: Decimal
+    ask_fee: Decimal
+    maker_bid_fee: Decimal
+    maker_ask_fee: Decimal
+    market: MarketInfo
+    bid_account: Account
+    ask_account: Account
+
+
+class Order(FormattableBaseModel):
+    uuid: OrderID
+    side: TradeSide
+    ord_type: OrderType
+    price: Decimal
+    state: OrderState
+    market: MarketID
+    created_at: datetime
+    volume: Decimal
+    remaining_volume: Decimal
+    reserved_fee: Decimal
+    remaining_fee: Decimal
+    paid_fee: Decimal
+    locked: Decimal
+    executed_volume: Decimal
+    trades_count: int
+
+    @field_validator("market", mode="before", check_fields=False)
+    def validate_market(cls, value):
+        if isinstance(value, str):
+            return MarketID.from_string(value)
+        return value
+    
+    @field_validator("created_at", mode="before", check_fields=False)
+    def validate_datetime(cls, value):
+        if isinstance(value, str):
+            return parse_datetime(value)
+        return value
+    
+    @field_validator("side", mode="before", check_fields=False)
+    def normalize_side(cls, v):
+        if isinstance(v, str):
+            return TradeSide(v.upper())
+        return v
+
+
+
+class Trade(FormattableBaseModel):
+    market: MarketID
+    uuid: OrderID
+    price: Decimal
+    volume: Decimal
+    funds: Decimal
+    side: TradeSide
+    created_at: datetime
+
+    @field_validator("market", mode="before", check_fields=False)
+    def validate_market(cls, value):
+        if isinstance(value, str):
+            return MarketID.from_string(value)
+        return value
+    
+    @field_validator("created_at", mode="before", check_fields=False)
+    def validate_datetime(cls, value):
+        if isinstance(value, str):
+            return parse_datetime(value)
+        return value
+    
+    @field_validator("side", mode="before", check_fields=False)
+    def normalize_side(cls, v):
+        if isinstance(v, str):
+            return TradeSide(v.upper())
+        return v
+
+
+class OrderInfo(Order):
+    trades : Optional[List[Trade]] = None
 
 
 class WalletStatus(FormattableBaseModel):
@@ -397,6 +472,7 @@ class WalletStatus(FormattableBaseModel):
             return parse_datetime(value)
         return value
 
+
 class APIKeyInfo(FormattableBaseModel):
     access_key: str
     expire_at: datetime
@@ -406,3 +482,9 @@ class APIKeyInfo(FormattableBaseModel):
         if isinstance(value, str):
             return parse_datetime(value)
         return value
+
+class OrderID(FormattableBaseModel):
+    id: str
+
+    def __str__(self) -> str:
+        return f"{self.currency_from}-{self.currency_to}"

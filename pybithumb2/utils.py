@@ -34,6 +34,9 @@ def clean_and_format_data(data: dict) -> dict:
             if val.tzinfo is None or val.tzinfo.utcoffset(val) is None:
                 val = val.replace(tzinfo=KST)
             return val.strftime(DATETIME_FORMAT)
+        
+        # elif isinstance(val, (int, float)):
+        #     return val
 
         return str(val)
 

@@ -1,12 +1,9 @@
-from decimal import Decimal
-
 from pybithumb2.client import BithumbClient
-from pybithumb2.models import Market, OrderBook
-from pybithumb2.types import RawData
+from pybithumb2.models import MarketID, OrderBook
 
 
 def test_get_orderbooks(api_client: BithumbClient,):
-    markets: Market = [Market.from_string("KRW-BTC"), Market.from_string("KRW-ETH")]
+    markets: list[MarketID] = [MarketID.from_string("KRW-BTC"), MarketID.from_string("KRW-ETH")]
     response = api_client.get_orderbooks(markets)
 
     assert len(response) > 0
@@ -18,7 +15,7 @@ def test_get_orderbooks(api_client: BithumbClient,):
 
 
 def test_get_orderbooks_single(api_client: BithumbClient):
-    markets: Market = [Market.from_string("KRW-BTC")]
+    markets: list[MarketID] = [MarketID.from_string("KRW-BTC")]
     response = api_client.get_orderbooks(markets)
 
     assert len(response) > 0
