@@ -19,8 +19,6 @@ keywords = [
     "client",
     "library",
     "trading",
-    "websocket",
-    "realtime",
     "investing",
     "crypto",
     "bithumb",
@@ -44,19 +42,22 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "pydantic==2.11.2",
-    "PyJWT==2.10.1",
-    "pytest==8.3.2",
-    "python-dotenv==1.1.0",
-    "python_dateutil==2.9.0.post0",
-    "Requests==2.32.3"
+    "pydantic>=2.7,<3",
+    "PyJWT>=2.8,<3",
+    "python-dateutil>=2.8",
+    "requests>=2.31,<3",
 ]
 dynamic = [
     "version",
 ]
+
+[project.optional-dependencies]
+pandas = ["pandas>=2"]
+dev = ["pytest>=8", "pytest-cov", "python-dotenv>=1", "pandas>=2"]
+
 [project.urls]
 "Issues" = "https://github.com/kahngjoonkoh/pybithumb2/issues"
-"Documentation" = "https://github.com/kahngjoonkoh/pybithumb2/docs"
+"Documentation" = "https://github.com/kahngjoonkoh/pybithumb2#readme"
 "Source Code" = "https://github.com/kahngjoonkoh/pybithumb2"
 
 [tool.setuptools.dynamic]
@@ -66,3 +67,7 @@ version = { attr = "pybithumb2.__env__.__version__" }
 where = ["."]
 include = ["pybithumb2"]
 exclude = ["tests"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

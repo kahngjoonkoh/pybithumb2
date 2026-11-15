@@ -13,7 +13,10 @@ from pybithumb2.constants import (
 
 
 def clean_and_format_data(data: dict) -> dict:
-    """removes empty values and converts non json serializable types"""
+    """
+    Removes empty values and converts values to what the API expects: lists stay lists (sent
+    as `key[]=v`), datetimes become KST strings, Decimals become plain (non-exponent) strings.
+    """
 
     def map_values(val: Any) -> Any:
         if isinstance(val, dict):
@@ -23,20 +26,22 @@ def clean_and_format_data(data: dict) -> dict:
                 if v is not None and v != {} and len(str(v)) > 0
             }
 
-        elif isinstance(val, list):
-            return ",".join(map_values(v) for v in val if v is not None and v != {})
+        elif isinstance(val, (list, tuple, set, frozenset)):
+            return [map_values(v) for v in val if v is not None and v != {}]
 
         elif isinstance(val, time):
             return val.strftime(TIME_FORMAT)
 
         elif isinstance(val, datetime):
-            # if the datetime is naive, assume it's KST
-            # https://docs.python.org/3/library/datetime.html#determining-if-an-object-is-aware-or-naive
+            # naive datetimes are taken as KST; aware ones are converted to KST
             if val.tzinfo is None or val.tzinfo.utcoffset(val) is None:
                 val = val.replace(tzinfo=KST)
-            return val.strftime(DATETIME_FORMAT)
+            return val.astimezone(KST).strftime(DATETIME_FORMAT)
 
-        elif isinstance(val, (int, float, Decimal)):
+        elif isinstance(val, Decimal):
+            return format(val, "f")
+
+        elif isinstance(val, (bool, int, float)):
             return val
 
         return str(val)

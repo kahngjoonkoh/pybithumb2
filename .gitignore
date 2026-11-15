@@ -12,3 +12,7 @@ __pycache__/
 # Ignore Build directories
 dist/
 *.egg-info
+
+# Virtual environments and coverage
+.venv/
+.coverage

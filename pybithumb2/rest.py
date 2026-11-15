@@ -1,3 +1,4 @@
+import json
 import jwt
 import uuid
 import time
@@ -6,10 +7,51 @@ import hashlib
 from abc import ABC
 from typing import List, Optional, Union
 from requests import Session, HTTPError
-from urllib.parse import urlencode
+from urllib.parse import quote
 
+from pybithumb2.__env__ import USER_AGENT
 from pybithumb2.types import HTTPResult
 from pybithumb2.exceptions import APIError
+
+
+def build_query(data: dict, encode: bool = False) -> str:
+    """
+    Serialises parameters the way the Bithumb API signs and parses them.
+
+    Lists become `key[]=v` and lists of dicts become `key[i][sub]=v`. With `encode=False` the
+    result is the unencoded string whose SHA512 is the JWT `query_hash`; with `encode=True` it
+    is the percent-encoded string sent on the URL.
+    """
+
+    def text(v) -> str:
+        return ("true" if v else "false") if isinstance(v, bool) else str(v)
+
+    q = (lambda v: quote(text(v), safe="")) if encode else text
+    parts = []
+    for key, value in data.items():
+        if value is None:
+            continue
+        if isinstance(value, (list, tuple)):
+            for i, item in enumerate(value):
+                if isinstance(item, dict):
+                    parts += [
+                        f"{q(key)}[{i}][{q(k)}]={q(v)}"
+                        for k, v in item.items()
+                        if v is not None
+                    ]
+                else:
+                    parts.append(f"{q(key)}[]={q(item)}")
+        else:
+            parts.append(f"{q(key)}={q(value)}")
+    return "&".join(parts)
+
+
+def _http_error(response) -> Optional[HTTPError]:
+    try:
+        response.raise_for_status()
+    except HTTPError as e:
+        return e
+    return None
 
 
 class RESTClient(ABC):
@@ -32,62 +74,72 @@ class RESTClient(ABC):
         method: str,
         path: str,
         is_private: bool,
-        data: Optional[Union[dict, str]] = None,
+        data: Optional[dict] = None,
         doseq: bool = False,
     ) -> HTTPResult:
         """
         Prepares and submits HTTP requests to given API endpoint and returns response.
 
+        GET and DELETE send `data` as the query string; other methods send it as a JSON body.
+        Private requests are signed with a JWT whose `query_hash` is the SHA512 of the
+        unencoded `key=value&...` form of the same data, as the API requires.
+
         Args:
             method (str): The API endpoint HTTP method
-            is_private (bool): Whether the request should use authentication headers.
             path (str): The API endpoint path
-            data (Union[dict, str], optional): Either the payload in json format, query params urlencoded, or a dict
-             of values to be converted to appropriate format based on `method`. Defaults to None.
-            doseq (bool): Whether list should be expanded into multiple parameters. Defaults to False.
+            is_private (bool): Whether the request should use authentication headers.
+            data (dict, optional): Query parameters or JSON body. Lists become `key[]=v`.
+            doseq (bool): Kept for backwards compatibility; lists are always expanded.
 
         Returns:
             HTTPResult: The response from the API
         """
         if is_private and not self._has_credentials:
-            raise APIError("invalid_jwt")
+            raise APIError(
+                {
+                    "name": "invalid_jwt",
+                    "message": "API key and secret key are required",
+                }
+            )
 
-        url: str = self._base_url + path
-        query = urlencode(data, doseq) if data is not None else None
+        data = data or None
+        in_query = method.upper() in ("GET", "DELETE")
+        url = path if path.startswith("https://") else self._base_url + path
+        if in_query and data:
+            url += "?" + build_query(data, encode=True)
 
-        headers = self._generate_headers(is_private, query)
+        headers = self._generate_headers(
+            is_private, build_query(data) if data else None
+        )
+        body = None
+        if not in_query and data is not None:
+            headers["Content-Type"] = "application/json"
+            body = json.dumps(data, default=str)
 
-        opts = {
-            "headers": headers,
-            "allow_redirects": False,
-        }
+        response = self._session.request(
+            method, url, headers=headers, data=body, allow_redirects=False
+        )
 
-        if method.upper() in ["GET", "DELETE"]:
-            opts["params"] = data
-        else:
-            opts["json"] = data
+        try:
+            obj = response.json() if response.text else None
+        except ValueError:
+            obj = None
 
-        # if query:
-        #     print(f"{url}?{query}")
-        # else:
-        #     print(url)
-
-        response = self._session.request(method, url, **opts)
-
+        if isinstance(obj, dict) and "error" in obj:
+            # Bithumb returns {"error": {"name", "message"}}, sometimes with a 2xx status.
+            raise APIError(obj["error"], _http_error(response))
+        if response.is_redirect:
+            # never follow: a redirect would resend the Authorization header elsewhere
+            raise APIError(
+                f"unexpected redirect ({response.status_code}) to {response.headers.get('location')}"
+            )
         try:
             response.raise_for_status()
         except HTTPError as http_error:
-            error = response.text
-            raise APIError(error, http_error)
-
-        if response.text != "":
-            obj = response.json()
-            if "error" in obj:
-                """Sometimes the response is an error but with a success status code."""
-                raise APIError(obj["error"])
-            return obj
-        else:
+            raise APIError(response.text, http_error)
+        if obj is None:
             raise APIError("Response is empty")
+        return obj
 
     def _generate_headers(self, is_private: bool, query: Optional[str]) -> dict:
         """
@@ -95,31 +147,27 @@ class RESTClient(ABC):
 
         Args:
             is_private (bool): Whether the request requires authentication.
-            query (str, optional): The query string (the part after '?') used in the request. Required to generate
-                query hash for authenticated private requests.
+            query (str, optional): The unencoded `key=value&...` string of the request's parameters
+                or body. Its SHA512 goes into the JWT payload as `query_hash`.
 
         Returns:
             dict: A dictionary containing HTTP headers, including Authorization if private.
         """
+        headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
         if not is_private:
-            return {"accept": "application/json"}
-        # Generate access token
+            return headers
         payload = {
             "access_key": self._api_key,
             "nonce": str(uuid.uuid4()),
             "timestamp": round(time.time() * 1000),
         }
         if query:
-            hash = hashlib.sha512()
-            hash.update(query.encode())
-            query_hash = hash.hexdigest()
-            payload["query_hash"] = query_hash
+            payload["query_hash"] = hashlib.sha512(query.encode()).hexdigest()
             payload["query_hash_alg"] = "SHA512"
 
-        jwt_token = jwt.encode(payload, self._secret_key)
-        authorization_token = f"Bearer {jwt_token}"
-
-        return {"Authorization": authorization_token}
+        jwt_token = jwt.encode(payload, self._secret_key, algorithm="HS256")
+        headers["Authorization"] = f"Bearer {jwt_token}"
+        return headers
 
     def get(
         self,

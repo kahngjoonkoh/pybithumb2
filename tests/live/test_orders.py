@@ -1,3 +1,4 @@
+import os
 import pytest
 import time
 
@@ -5,8 +6,13 @@ from typing import List
 from decimal import Decimal
 
 from pybithumb2.client import BithumbClient
-from pybithumb2.models import MarketID, Order, OrderAvailable, Snapshot, OrderInfo
+from pybithumb2.models import MarketID, Order, OrderAvailable, Snapshot, OrderCreated
 from pybithumb2.types import OrderID, TradeSide, OrderType, OrderState
+
+pytestmark = pytest.mark.skipif(
+    os.getenv("PYBITHUMB2_LIVE_ORDERS") != "1",
+    reason="places a real order: set PYBITHUMB2_LIVE_ORDERS=1 to run",
+)
 
 
 @pytest.fixture(scope="module")
@@ -22,27 +28,26 @@ def order_id(market_id: MarketID, api_client: BithumbClient):
         snapshot.trade_price * Decimal(0.2)
     )  # minimum bid price is 10% of current price.
 
-    order: Order = api_client.submit_order(
+    order: OrderCreated = api_client.submit_order(
         market_id,
         TradeSide.BID,
         price=test_price,
-        volume=6000
-        / test_price,  # 6000 KRW so that it exceeds the minimum order 5000 KRW even with slight fluctuations.
+        # 6000 KRW so that it exceeds the minimum order 5000 KRW even with slight fluctuations.
+        volume=round(Decimal(6000) / test_price, 4),
         ord_type=OrderType.LIMIT,
     )
 
     time.sleep(0.5)  # time to process and reflect the order in their system
 
-    assert isinstance(order.uuid, OrderID)
+    assert isinstance(order.order_id, OrderID)
 
-    yield order.uuid
-    # TODO: the test for cancel_order is slightly buggy. I think it may be a problem with the server data updates?
-    api_client.cancel_order(order.uuid)
-    response: OrderInfo = api_client.get_orders(
-        market_id, [order.uuid], state=OrderState.CANCEL
-    )[0]
+    yield order.order_id
+    # cancelling is asynchronous: give it a moment before checking
+    api_client.cancel_order(order.order_id)
+    time.sleep(1)
+    response = api_client.get_order_info(order.order_id)
 
-    assert response.uuid == order.uuid
+    assert response.state == OrderState.CANCEL
 
 
 def test_get_order_available(
@@ -60,13 +65,8 @@ def test_get_order_available(
 def test_get_order_info(
     order_id: OrderID, api_client: BithumbClient, raw_api_client: BithumbClient
 ):
-    response = api_client.get_order_info(order_id)
-    raw_response = raw_api_client.get_order_info(order_id)
-
-    assert len(response) > 0
-
-    test_item = response[0]
-    raw_test_item = raw_response[0]
+    test_item = api_client.get_order_info(order_id)
+    raw_test_item = raw_api_client.get_order_info(order_id)
 
     assert str(test_item.uuid) == raw_test_item["uuid"]
     assert test_item.state == OrderState.WAIT

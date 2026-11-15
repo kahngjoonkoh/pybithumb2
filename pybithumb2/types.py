@@ -62,9 +62,46 @@ class WarningType(FormattableEnum):
 
 
 class OrderType(FormattableEnum):
+    """
+    LIMIT: 지정가, PRICE: 시장가 매수 (price is the total to spend),
+    MARKET: 시장가 매도, BEST: 최유리 지정가 (KRW markets only)
+    """
+
     LIMIT = "limit"
     PRICE = "price"
     MARKET = "market"
+    BEST = "best"
+
+
+class TimeInForce(FormattableEnum):
+    IOC = "ioc"
+    FOK = "fok"
+    POST_ONLY = "post_only"
+
+
+class WarningStep(FormattableEnum):
+    CAUTION = "CAUTION"
+    WARNING = "WARNING"
+    DANGER = "DANGER"
+
+
+class TwapFrequency(FormattableEnum):
+    """Seconds between the child orders of a TWAP order."""
+
+    S15 = "15"
+    S20 = "20"
+    S30 = "30"
+    S60 = "60"
+    S120 = "120"
+
+
+class ReceiverType(FormattableEnum):
+    PERSONAL = "personal"
+    CORPORATION = "corporation"
+
+
+class TwoFactorType(FormattableEnum):
+    KAKAO = "kakao"
 
 
 class MarketState(FormattableEnum):
@@ -74,6 +111,7 @@ class MarketState(FormattableEnum):
 class OrderState(FormattableEnum):
     WAIT = "wait"
     WATCH = "watch"
+    PROGRESS = "progress"
     DONE = "done"
     CANCEL = "cancel"
 

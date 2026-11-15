@@ -1,8 +1,10 @@
 import sys
 
 API_BASE_URL = "https://api.bithumb.com"
+# notices are served from here; api.bithumb.com/v1/notices redirects to it
+FEED_API_BASE_URL = "https://feed-api.bithumb.com"
 
-VERSION = "1.0.0-beta"
+VERSION = "1.0.0b1"
 
 USER_AGENT = f"pybithumb2/{VERSION}"
 

@@ -1,26 +1,40 @@
 import json
+from typing import Optional, Union
 
 
 class APIError(Exception):
     """
-    Represent API related error.
-    error.status_code will have http status code.
+    An error from the Bithumb API, or a request refused before it was sent.
+
+    `name` is Bithumb's error code (e.g. "invalid_jwt", "order_not_found"), `message` its text,
+    and `status_code` the HTTP status when there was a response.
     """
 
-    def __init__(self, error, http_error=None):
-        super().__init__(error)
+    def __init__(self, error: Union[dict, str], http_error=None):
         self._error = error
         self._http_error = http_error
+        self.name, self.message = self._parse(error)
+        super().__init__(f"{self.name}: {self.message}" if self.message else self.name)
+
+    @staticmethod
+    def _parse(error: Union[dict, str]) -> "tuple[str, Optional[str]]":
+        if isinstance(error, str):
+            try:
+                error = json.loads(error)
+            except ValueError:
+                return error, None
+        if isinstance(error, dict):
+            error = error.get("error", error)
+            if isinstance(error, dict):
+                return str(error.get("name") or error.get("code") or ""), error.get(
+                    "message"
+                )
+        return str(error), None
 
     @property
-    def code(self):
-        error = json.loads(self._error)
-        return error["code"]
-
-    @property
-    def message(self):
-        error = json.loads(self._error)
-        return error["message"]
+    def code(self) -> str:
+        """Alias of `name`, kept for backwards compatibility."""
+        return self.name
 
     @property
     def status_code(self):
